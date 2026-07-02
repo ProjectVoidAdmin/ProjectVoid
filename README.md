@@ -1,2 +1,0 @@
-# ProjectVoid
-Project Void Client
