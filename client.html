@@ -14614,6 +14614,49 @@ function _silenceAllMusic(){
   if(bgm){bgm.pause();bgm.removeAttribute("src");bgm.currentTime=0;}
 }
 
+// ========================================
+//  RESUME MUSIC AFTER AN INVOLUNTARY PAUSE
+// ========================================
+// Browsers (especially mobile) frequently pause background <audio>/<video>
+// when something else takes audio focus — tabbing out to play a song
+// elsewhere, taking a call, switching apps, etc. That pause happens outside
+// our own code, so nothing normally puts the track back on when focus
+// returns. This listens for the tab/app becoming active again and resumes
+// anything that still has a track loaded but silently got paused underneath
+// us. A cleared zone-bgm src means we intentionally want silence right now
+// (mid travel-transition, post-logout, etc.), so that case is left alone —
+// only tracks that SHOULD be playing get resumed.
+function _resumeInterruptedMedia(){
+  const activeScreen=document.querySelector(".screen.active");
+  const activeId=activeScreen?activeScreen.id:null;
+  // Login screen theme + background video — only while that screen is showing.
+  if(activeId==="login-screen"){
+    const _bgm=el("login-bgm");
+    if(_bgm&&_bgm.paused&&_bgm.src){
+      const _p=_bgm.play();
+      if(_p&&_p.catch)_p.catch(()=>{});
+    }
+    const _bgVid=el("login-bg-video");
+    if(_bgVid&&_bgVid.paused&&_bgVid.style.display==="block"){
+      const _pv=_bgVid.play();
+      if(_pv&&_pv.catch)_pv.catch(()=>{});
+    }
+  }
+  // Zone / activity / boss music — covers all of these since they all play
+  // through the same zone-bgm element.
+  const bgm=el("zone-bgm");
+  if(bgm&&bgm.paused&&bgm.src){
+    const _p=bgm.play();
+    if(_p&&_p.catch)_p.catch(()=>{});
+  }
+  // One-shot outcome tracks (victory/death/etc.) are short and tied to a
+  // specific moment - intentionally not resumed if interrupted, same as any
+  // sound effect that got cut off mid-play.
+}
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden)_resumeInterruptedMedia(); });
+window.addEventListener("focus",_resumeInterruptedMedia);
+window.addEventListener("pageshow",_resumeInterruptedMedia);
+
 function showTravelScreen(zoneName, isSafe, onDone, zoneId){
   // Layer 1: destination name lock.
   // Drop any call that isn't for the locked destination zone.
