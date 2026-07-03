@@ -1,18 +1,325 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Project Void</title>
-<!-- Fallback for browsers with JS disabled -->
-<meta http-equiv="refresh" content="0; url=client.html">
-<style>html,body{margin:0;padding:0;background:#000;height:100%;}</style>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  :root{
+    --void-black: #05050a;
+    --void-deep: #0c0a17;
+    --void-violet: #7c3aed;
+    --void-violet-dim: #4c1d95;
+    --void-cyan: #2dd4bf;
+    --text-main: #e8e6f0;
+    --text-dim: #8b87a0;
+  }
+
+  *{ box-sizing: border-box; margin:0; padding:0; }
+
+  @keyframes fadeUp{
+    from{ opacity:0; transform: translateY(16px); }
+    to{ opacity:1; transform: translateY(0); }
+  }
+
+  @keyframes materialize{
+    from{ opacity:0; filter: blur(10px); transform: scale(0.95); }
+    to{ opacity:1; filter: blur(0); transform: scale(1); }
+  }
+
+  @keyframes titleGlow{
+    0%, 100%{ text-shadow: 0 0 60px rgba(124,58,237,0.35); }
+    50%{ text-shadow: 0 0 90px rgba(124,58,237,0.55), 0 0 40px rgba(45,212,191,0.2); }
+  }
+
+  @keyframes shimmer{
+    0%{ background-position: 0% 50%; }
+    100%{ background-position: 200% 50%; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+  }
+
+  html,body{
+    height:100%;
+    background: var(--void-black);
+    color: var(--text-main);
+    font-family: 'IBM Plex Mono', monospace;
+    overflow-x:hidden;
+  }
+
+  /* --- ambient void field --- */
+  .void-field{
+    position:fixed;
+    inset:0;
+    z-index:0;
+    background:
+      radial-gradient(ellipse 60% 50% at 50% 20%, rgba(124,58,237,0.25), transparent 60%),
+      var(--void-black);
+  }
+
+  .stars{
+    position:fixed;
+    inset:0;
+    z-index:0;
+    background-image:
+      radial-gradient(1px 1px at 20% 30%, #fff, transparent),
+      radial-gradient(1px 1px at 70% 60%, #fff, transparent),
+      radial-gradient(1px 1px at 40% 80%, #fff, transparent),
+      radial-gradient(2px 2px at 85% 20%, #fff, transparent),
+      radial-gradient(1px 1px at 55% 15%, #fff, transparent),
+      radial-gradient(1px 1px at 10% 70%, #fff, transparent),
+      radial-gradient(2px 2px at 90% 55%, #fff, transparent),
+      radial-gradient(1px 1px at 30% 50%, #fff, transparent),
+      radial-gradient(1px 1px at 65% 90%, #fff, transparent),
+      radial-gradient(1px 1px at 95% 85%, #fff, transparent);
+    background-repeat: repeat;
+    background-size: 600px 600px;
+    opacity:0.5;
+    animation: drift 90s linear infinite;
+  }
+
+  @keyframes drift{
+    from{ background-position: 0 0; }
+    to{ background-position: -600px 300px; }
+  }
+
+  main{
+    position:relative;
+    z-index:1;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:flex-start;
+    padding: 12vh 6vw 6vh;
+    text-align:center;
+  }
+
+  .eyebrow{
+    color: var(--text-main);
+    font-size: clamp(0.55rem, 2.4vw, 0.75rem);
+    letter-spacing: clamp(0.15em, 1.2vw, 0.45em);
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+    white-space: nowrap;
+    opacity: 0;
+    animation: fadeUp 0.7s ease forwards 0.1s;
+  }
+
+  h1{
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 900;
+    font-size: clamp(2.6rem, 9vw, 6rem);
+    letter-spacing: 0.08em;
+    line-height: 1;
+    background: linear-gradient(180deg, #ffffff 0%, #c9c3ff 45%, var(--void-violet) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    margin-bottom: 0.4rem;
+    opacity: 0;
+    animation:
+      materialize 0.9s cubic-bezier(0.16,1,0.3,1) forwards 0.3s,
+      titleGlow 4s ease-in-out infinite 1.2s;
+  }
+
+  .subline{
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    letter-spacing: 0.05em;
+    margin-bottom: 3rem;
+  }
+
+  /* --- enter button --- */
+  .btn-wrap{
+    opacity: 0;
+    animation: fadeUp 0.7s ease forwards 1.05s;
+  }
+
+  .enter-btn{
+    position:relative;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:0.75rem;
+    min-width: 320px;
+    max-width: 90vw;
+    padding: 1rem 4rem;
+    font-family: 'Orbitron', sans-serif;
+    font-weight:700;
+    font-size: 1.05rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--void-black);
+    background: linear-gradient(90deg, var(--void-cyan), var(--void-violet), var(--void-cyan));
+    background-size: 200% 100%;
+    border: none;
+    border-radius: 2px;
+    text-decoration:none;
+    cursor:pointer;
+    box-shadow: 0 0 25px rgba(124,58,237,0.45), 0 0 55px rgba(45,212,191,0.15);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    animation: shimmer 5s linear infinite;
+  }
+
+  .enter-btn:hover{
+    transform: translateY(-2px);
+    box-shadow: 0 0 35px rgba(124,58,237,0.65), 0 0 75px rgba(45,212,191,0.25);
+  }
+
+  .enter-btn:active{
+    transform: translateY(0px) scale(0.98);
+  }
+
+  .enter-btn.disabled{
+    background: linear-gradient(90deg, #4b5563, #374151);
+    color: #9ca3af;
+    box-shadow: none;
+    cursor: not-allowed;
+    pointer-events: none;
+    opacity: 0.6;
+    animation: none;
+  }
+
+  .enter-btn.disabled::after{
+    border-top-color: #9ca3af;
+    border-right-color: #9ca3af;
+  }
+
+  .enter-btn::after{
+    content:'';
+    width:8px; height:8px;
+    border-top: 2px solid var(--void-black);
+    border-right: 2px solid var(--void-black);
+    transform: rotate(45deg);
+  }
+
+  /* --- description section --- */
+  .description{
+    margin-top: 0.4rem;
+    margin-bottom: 2.5rem;
+    max-width: 640px;
+  }
+
+  .description .label{
+    font-size: 0.7rem;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: var(--void-cyan);
+    opacity:0.8;
+    margin-bottom: 1rem;
+  }
+
+  /* ============================================================
+     EDIT ME: change the text inside <p class="game-description">
+     to describe Project Void. Add more <p> tags for more
+     paragraphs if you want.
+     ============================================================ */
+  .game-description{
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    line-height: 1.7;
+  }
+
+  .server-status{
+    text-align:center;
+    font-size: 0.95rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0;
+    animation: fadeUp 0.7s ease forwards 0.85s;
+  }
+
+  @keyframes pulse-dot{
+    0%, 100%{ opacity: 1; }
+    50%{ opacity: 0.5; }
+  }
+
+  #status-text.online{ color: #22c55e; }
+  #status-text.offline{ color: #ef4444; }
+
+
+</style>
 </head>
 <body>
-<script>
-// location.replace (not href) so this redirect page doesn't sit in browser history —
-// pressing back from the game goes to wherever the player came from, not back to this stub.
-window.location.replace("client.html");
-</script>
+
+  <div class="void-field"></div>
+  <div class="stars"></div>
+
+  <main>
+    <div class="eyebrow">Browser-Based MMORPG</div>
+    <h1>PROJECT<br>VOID</h1>
+
+    <div class="description">
+      <div class="server-status" id="server-status">
+        <span id="status-text">Checking&hellip;</span>
+      </div>
+    </div>
+
+    <div class="btn-wrap">
+      <a class="enter-btn disabled" id="enter-btn" href="client.html" rel="noopener" aria-disabled="true">
+        Enter
+      </a>
+    </div>
+  </main>
+
+  <script>
+    (function(){
+      const text = document.getElementById('status-text');
+      const enterBtn = document.getElementById('enter-btn');
+      const WS_URL = 'wss://project-void-functions.fly.dev';
+
+      enterBtn.addEventListener('click', (e) => {
+        if(enterBtn.classList.contains('disabled')) e.preventDefault();
+      });
+
+      function setOnline(){
+        text.textContent = 'Server Online';
+        text.className = 'online';
+        enterBtn.classList.remove('disabled');
+        enterBtn.removeAttribute('aria-disabled');
+      }
+      function setOffline(){
+        text.textContent = 'Server Offline';
+        text.className = 'offline';
+        enterBtn.classList.add('disabled');
+        enterBtn.setAttribute('aria-disabled', 'true');
+      }
+
+      let settled = false;
+      let ws;
+      const timeout = setTimeout(() => {
+        if(settled) return;
+        settled = true;
+        setOffline();
+        if(ws) try{ ws.close(); }catch(e){}
+      }, 6000);
+
+      try{
+        ws = new WebSocket(WS_URL);
+        ws.onopen = () => {
+          if(settled) return;
+          settled = true;
+          clearTimeout(timeout);
+          setOnline();
+          try{ ws.close(); }catch(e){}
+        };
+        ws.onerror = () => {
+          if(settled) return;
+          settled = true;
+          clearTimeout(timeout);
+          setOffline();
+        };
+      }catch(e){
+        clearTimeout(timeout);
+        setOffline();
+      }
+    })();
+  </script>
+
 </body>
 </html>
