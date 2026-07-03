@@ -1771,11 +1771,12 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   <!-- Log area with General/Party/Guild/Combat tabs -->
   <div id="log-area" style="flex:1;display:flex;flex-direction:column;min-height:0;">
     <div style="display:flex;flex-shrink:0;border-bottom:1px solid #222;">
-      <button id="log-tab-chat" style="flex:1;padding:5px 2px;background:#000;border:none;color:#fff;font-size:9px;letter-spacing:1px;font-family:'Courier New',monospace;">GENERAL</button>
+      <button id="log-tab-chat" style="flex:1;padding:5px 2px;background:#000;border:none;color:#fff;font-size:9px;letter-spacing:1px;font-family:'Courier New',monospace;">ZONE</button>
       <button id="log-tab-party" style="flex:1;padding:5px 2px;background:#000;border:none;color:#555;font-size:9px;letter-spacing:1px;font-family:'Courier New',monospace;">PARTY</button>
       <button id="log-tab-guild" style="flex:1;padding:5px 2px;background:#000;border:none;color:#555;font-size:9px;letter-spacing:1px;font-family:'Courier New',monospace;">GUILD</button>
       <button id="log-tab-system" style="flex:1;padding:5px 2px;background:#000;border:none;color:#555;font-size:9px;letter-spacing:1px;font-family:'Courier New',monospace;">SYSTEM</button>
       <button id="log-tab-combat" style="flex:1;padding:5px 2px;background:#000;border:none;color:#555;font-size:9px;letter-spacing:1px;font-family:'Courier New',monospace;">COMBAT</button>
+      <button id="log-tab-loot" style="flex:1;padding:5px 2px;background:#000;border:none;color:#555;font-size:9px;letter-spacing:1px;font-family:'Courier New',monospace;">LOOT</button>
     </div>
     <div id="log-chat" style="flex:1;overflow-y:auto;padding:6px 14px 4px;display:flex;flex-direction:column;touch-action:pan-y;"></div>
     <div id="log-party" style="flex:1;overflow-y:auto;padding:6px 14px 4px;display:none;flex-direction:column;touch-action:pan-y;"></div>
@@ -1783,6 +1784,7 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
     <div id="log-dm" style="flex:1;overflow-y:auto;padding:6px 14px 4px;display:none;flex-direction:column;touch-action:pan-y;"></div>
     <div id="log-system" style="flex:1;overflow-y:auto;padding:6px 14px 4px;display:none;flex-direction:column;touch-action:pan-y;"></div>
     <div id="log-combat" style="flex:1;overflow-y:auto;padding:6px 14px 4px;display:none;flex-direction:column;touch-action:pan-y;"></div>
+    <div id="log-loot" style="flex:1;overflow-y:auto;padding:6px 14px 4px;display:none;flex-direction:column;touch-action:pan-y;"></div>
   </div>
 
   <!-- Chat bar: bottom of log, above nav tabs (out of combat) or above enemy cards (in combat) -->
@@ -3507,7 +3509,7 @@ function _combatLogColour(ef, iAmAttacker, iAmVictim) {
 
 // ── Global tap lock — 500ms cooldown shared across all interactive elements ──
 let _tapLocked=false;
-const _NO_LOCK_SEL='.tab-btn,.subtab-btn,#log-tab-chat,#log-tab-party,#log-tab-guild,#log-tab-system,#log-tab-combat,.friend-add-btn,[data-friend],[data-cancelpending],[data-party-invite],[data-mtab],[data-eqtab],#stats-btn,.market-buy-btn,.popup-close,.world-btn,.zone-travel-btn,.chat-player-box-btn,.chat-player-box-x,#item-detail-sell-btn,#bag-sell-btn,#bag-sell-mat-btn,#party-leave-btn,.confirm-yes,.confirm-no,.list-item-btn,.craft-btn,.quest-accept-btn,[data-party-kick],[data-party-invite],[data-equipslot],[data-bagequip],[data-bagequipped],[data-provi],[data-mat],[data-zoneid],[data-buyid],.bag-equip-btn,#arena-1v1,#party-invite-btn';
+const _NO_LOCK_SEL='.tab-btn,.subtab-btn,#log-tab-chat,#log-tab-party,#log-tab-guild,#log-tab-system,#log-tab-combat,#log-tab-loot,.friend-add-btn,[data-friend],[data-cancelpending],[data-party-invite],[data-mtab],[data-eqtab],#stats-btn,.market-buy-btn,.popup-close,.world-btn,.zone-travel-btn,.chat-player-box-btn,.chat-player-box-x,#item-detail-sell-btn,#bag-sell-btn,#bag-sell-mat-btn,#party-leave-btn,.confirm-yes,.confirm-no,.list-item-btn,.craft-btn,.quest-accept-btn,[data-party-kick],[data-party-invite],[data-equipslot],[data-bagequip],[data-bagequipped],[data-provi],[data-mat],[data-zoneid],[data-buyid],.bag-equip-btn,#arena-1v1,#party-invite-btn';
 function _tapLock(el){
   if(el&&el.matches&&el.matches(_NO_LOCK_SEL))return true; // always allow
   if(_tapLocked)return false;
@@ -3783,11 +3785,12 @@ const CHAT_TYPES=new Set(["zonechat","guildchat","partychat"]);
 const GUILD_TYPES=new Set(["guildchat"]);
 const PARTY_TYPES=new Set(["partychat"]);
 const DM_TYPES=new Set(["dm"]);
-const SYSTEM_TYPES=new Set(["system","info","purchase","fish","loot"]);
+const SYSTEM_TYPES=new Set(["system","info","purchase"]);
+const LOOT_TYPES=new Set(["loot","fish"]);
 let activeLogTab="chat";
 const _unreadLogTabs=new Set();
 function _applyLogTabColors(){
-  ["chat","party","guild","system","combat"].forEach(function(t){
+  ["chat","party","guild","system","combat","loot"].forEach(function(t){
     const btn=el("log-tab-"+t);
     if(!btn)return;
     if(t===activeLogTab){btn.style.color="#fff";}
@@ -3801,10 +3804,12 @@ function addLog(type,text){
   const isChatType=CHAT_TYPES.has(type);
   const isSystemType=SYSTEM_TYPES.has(type);
   const isDmType=DM_TYPES.has(type);
+  const isLootType=LOOT_TYPES.has(type);
   let targetId;
   if(isGuildType) targetId="log-guild";
   else if(isPartyType) targetId="log-party";
   else if(isDmType) targetId="log-chat";
+  else if(isLootType) targetId="log-loot";
   else if(isSystemType) targetId="log-system";
   else if(isChatType) targetId="log-chat";
   else targetId="log-combat";
@@ -3893,9 +3898,10 @@ function addLog(type,text){
   if(isGuildType&&activeLogTab!=="guild"){_unreadLogTabs.add("guild");}
   else if(isPartyType&&activeLogTab!=="party"){_unreadLogTabs.add("party");}
   else if(isDmType&&activeLogTab!=="chat"){_unreadLogTabs.add("chat");}
+  else if(isLootType&&activeLogTab!=="loot"){_unreadLogTabs.add("loot");}
   else if(isSystemType&&activeLogTab!=="system"){_unreadLogTabs.add("system");}
   else if(isChatType&&!isGuildType&&!isPartyType&&activeLogTab!=="chat"){_unreadLogTabs.add("chat");}
-  else if(!isChatType&&!isSystemType&&!isDmType&&activeLogTab!=="combat"){_unreadLogTabs.add("combat");}
+  else if(!isChatType&&!isSystemType&&!isDmType&&!isLootType&&activeLogTab!=="combat"){_unreadLogTabs.add("combat");}
   _applyLogTabColors();
 }
 function switchLogTab(tab){
@@ -3906,16 +3912,17 @@ function switchLogTab(tab){
   el("log-dm").style.display="none";
   el("log-system").style.display=tab==="system"?"flex":"none";
   el("log-combat").style.display=tab==="combat"?"flex":"none";
+  el("log-loot").style.display=tab==="loot"?"flex":"none";
   _unreadLogTabs.delete(tab);
   _applyLogTabColors();
-  // Disable chat input on combat and system tabs
+  // Disable chat input on combat, system, and loot tabs (log-only, not chat channels)
   const chatBar=el("chat-bar");
   const chatInput=el("chat-input");
   const chatSendBtn=el("chat-send");
-  if(tab==="combat"||tab==="system"){
+  if(tab==="combat"||tab==="system"||tab==="loot"){
     if(chatInput){chatInput.style.opacity="0.3";chatInput.style.pointerEvents="none";}
     if(chatSendBtn){chatSendBtn.style.opacity="0.3";chatSendBtn.style.pointerEvents="none";}
-    if(chatInput){chatInput.dataset.placeholder=tab==="combat"?"Combat log only...":"System log only...";if(window._vkbRender)window._vkbRender(chatInput);}
+    if(chatInput){chatInput.dataset.placeholder=tab==="combat"?"Combat log only...":tab==="loot"?"Loot log only...":"System log only...";if(window._vkbRender)window._vkbRender(chatInput);}
   } else {
     if(chatInput){chatInput.style.opacity="";chatInput.style.pointerEvents="";}
     if(chatSendBtn){chatSendBtn.style.opacity="";chatSendBtn.style.pointerEvents="";}
@@ -3927,7 +3934,7 @@ function switchLogTab(tab){
       if(chatInput){chatInput.dataset.placeholder="Zone chat...";if(window._vkbRender)window._vkbRender(chatInput);}
     }
   }
-  const activeLog=el(tab==="chat"?"log-chat":tab==="party"?"log-party":tab==="guild"?"log-guild":tab==="system"?"log-system":"log-combat");
+  const activeLog=el(tab==="chat"?"log-chat":tab==="party"?"log-party":tab==="guild"?"log-guild":tab==="system"?"log-system":tab==="loot"?"log-loot":"log-combat");
   if(activeLog)activeLog.scrollTop=99999;
 }
 async function openCharSheetPopup(name, username, onClose){
@@ -4928,6 +4935,10 @@ var _DEV_FIELDS = {
     {k:'rarity',       l:'Rarity',        t:'select', req:true, opts:['Common','Uncommon','Rare','Epic','Legendary','Mythic']},
     {k:'respawnRule',  l:'Type',          t:'select', req:true, opts:['Safe','Danger']},
     {k:'music',        l:'Music Track',   t:'text', ph:'e.g. Duskwatch.mp3 (uploaded to /music) — leave blank for none'},
+    {k:'exploreMusic',   l:'Explore Music',      t:'text', ph:'e.g. DuskwatchExplore.mp3 — plays during Explore, leave blank to keep zone music', showIf:{k:'respawnRule',v:'Danger'}},
+    {k:'arenaMusic1v1',  l:'Arena Music (1v1)',  t:'text', ph:'e.g. Arena1v1.mp3 — leave blank for no arena music', showIf:{k:'respawnRule',v:'Safe'}},
+    {k:'arenaMusic2v2',  l:'Arena Music (2v2)',  t:'text', ph:'e.g. Arena2v2.mp3 — leave blank for no arena music', showIf:{k:'respawnRule',v:'Safe'}},
+    {k:'arenaMusic4v4',  l:'Arena Music (4v4)',  t:'text', ph:'e.g. Arena4v4.mp3 — leave blank for no arena music', showIf:{k:'respawnRule',v:'Safe'}},
     {k:'_market',      l:'Market',        t:'marketbox',   showIf:{k:'respawnRule',v:'Safe'}},
     {k:'_assignments', l:'Hostiles',      t:'assignmentsbox', showIf:{k:'respawnRule',v:'Danger'}},
     {k:'_subzones',    l:'Subzones',      t:'subzonesbox'},
@@ -8323,6 +8334,11 @@ function _devRenderSubzonesBox(container, tab, existingData) {
         +'<div class="dev-sub-col-label">TYPE</div>'
         +_devMiniSelectHtml2('sz','type',sub.type||'Dungeon',['Dungeon','Raid','Trial','Fishing'],idx,tab)
         +'</div></div>'
+        +'<div style="margin-bottom:5px;">'
+        +'<div class="dev-sub-col-label">MUSIC TRACK</div>'
+        +'<div class="vfield dev-vfield dev-effect-vfield" id="'+vbase+'_music" data-vfield="'+vbase+'_music" data-maxlen="80" data-ph="e.g. GoblinDungeon.mp3 — leave blank to keep zone music">'
+        +(sub.music?'<span class="vfield-text">'+sub.music+'</span>':'')
+        +'</div></div>'
         +(isFishing?''
           :'<div style="margin-bottom:5px;">'
           +'<div class="dev-sub-col-label">LAYOUT / MECHANICS</div>'
@@ -8423,6 +8439,9 @@ function _devRenderSubzonesBox(container, tab, existingData) {
       // Sync name for all subzone types (including fishing)
       var nv=window._vkbGetVal?window._vkbGetVal('devsz_'+t+'_'+idx+'_name'):null;
       if(nv!==null&&nv!==undefined&&nv!=='')sub.name=nv;
+      // Sync music track for all subzone types
+      var mv=window._vkbGetVal?window._vkbGetVal('devsz_'+t+'_'+idx+'_music'):null;
+      if(mv!==null&&mv!==undefined&&mv!=='')sub.music=mv;
       // Sync layout only for non-fishing subzones
       if(sub.type!=='Fishing'){
         var lv=window._vkbGetVal?window._vkbGetVal('devsz_'+t+'_'+idx+'_layout'):null;
@@ -10197,6 +10216,9 @@ function _devRunAiAnalysis(){
       // Sync name for all subzone types (including fishing)
       var nv=window._vkbGetVal?window._vkbGetVal('devsz_'+_preSaveCat+'_'+idx+'_name'):null;
       if(nv!==null&&nv!==undefined)sub.name=nv;
+      // Sync music track for all subzone types
+      var mv=window._vkbGetVal?window._vkbGetVal('devsz_'+_preSaveCat+'_'+idx+'_music'):null;
+      if(mv!==null&&mv!==undefined)sub.music=mv;
       // Sync layout only for non-fishing subzones
       if(sub.type!=='Fishing'){
         var lv=window._vkbGetVal?window._vkbGetVal('devsz_'+_preSaveCat+'_'+idx+'_layout'):null;
@@ -13334,7 +13356,11 @@ function _handlePartyWsMessage(msg){
       }
       _dismissArenaConfirm();
       _closeAllUI();
-      showPvPMatchScreen(STATE._pvpOpponentName,()=>{});
+      const _arenaTrack=STATE.zone&&STATE.zone['arenaMusic'+STATE._lastArenaMode];
+      _silenceAllMusic();
+      showPvPMatchScreen(STATE._pvpOpponentName,()=>{
+        STATE._activityMusicActive=_playActivityMusic(_arenaTrack);
+      });
       renderWorldNav();
       break;
     }
@@ -13444,7 +13470,14 @@ function _handlePartyWsMessage(msg){
       _syncPartyMembersFromWs(msg.members||[]);
       if(STATE.stateRef){STATE.stateRef.enemies=STATE.combatEnemies;STATE.stateRef.player=STATE.player;}
       renderCombatUI();
-      _dismissCombatTransition();
+      _dismissCombatTransition(()=>{
+        // PvP arena music is handled separately by showPvPMatchScreen's own
+        // transition (5s opponent-reveal screen) - don't double-trigger here.
+        if(!STATE._isPvP&&STATE._pendingActivityTrack!==undefined){
+          STATE._activityMusicActive=_playActivityMusic(STATE._pendingActivityTrack);
+          STATE._pendingActivityTrack=undefined;
+        }
+      });
       if(STATE._isPvP){
         addLog("combat_info","Arena fight started!");
       } else {
@@ -13835,6 +13868,7 @@ function _handlePartyWsMessage(msg){
         endCombatUI();
         _safeZoneHeal();
         saveGame(true);
+        _revertActivityMusic();
         // Don't close WS - let it reconnect for future use
         setTimeout(()=>{if(!STATE.inCombat&&(!_partyWs||_partyWs.readyState!==1))_connectCombatWsForRejoin();},2000);
         if(isVictory){
@@ -13914,9 +13948,11 @@ function _handlePartyWsMessage(msg){
           msg.itemsEach.forEach(drop=>{
             const col=_rarityColour[drop.rarity]||'#aaaaaa';
             _lootLines.push(`<span style="color:${col}">+ ${drop.qty > 1 ? drop.qty+'x ' : ''}${drop.name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>`);
+            addLog("loot",`+ ${drop.qty>1?drop.qty+'x ':''}${drop.name}`);
           });
         }
         endCombatUI();
+        _revertActivityMusic();
         showVictoryScreen(_lootLines,()=>{
           renderWorldNav();updateChatBar();
           _broadcastZone(STATE.zone.id);
@@ -13928,7 +13964,8 @@ function _handlePartyWsMessage(msg){
         const respawnZoneId=msg.respawnZone||STATE.player.respawnZone||"safe_duskwatch";
         const respawnZone=ZONES.find(z=>z.id===respawnZoneId)||ZONES[0];
         STATE.zone=respawnZone;
-        _updateZoneMusic(respawnZone.name, respawnZone.id);
+        _silenceAllMusic();
+        STATE._activityMusicActive=false;STATE._pendingActivityTrack=undefined;
         STATE.tab="world";
         STATE._hasFled=false;
         updatePlayer(pp=>({...pp,hp:1,energy:0,cooldowns:{},isAlive:true}));
@@ -13939,14 +13976,15 @@ function _handlePartyWsMessage(msg){
         _safeZoneHeal();
         STATE.travelCooldown=60;startCooldownTicker();
         saveGame(true);
-        showBerserkWipeScreen(respawnZone.name,()=>{renderWorldNav();updateChatBar();setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);});
+        showBerserkWipeScreen(respawnZone.name,()=>{_updateZoneMusic(respawnZone.name, respawnZone.id);renderWorldNav();updateChatBar();setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);});
         return;
       } else if(msg.outcome==="death"){
         // Determine respawn zone - use leader's zone from server, fallback to player's own setting
         const respawnZoneId=msg.respawnZone||STATE.player.respawnZone||"safe_duskwatch";
         const respawnZone=ZONES.find(z=>z.id===respawnZoneId)||ZONES[0];
         STATE.zone=respawnZone;
-        _updateZoneMusic(respawnZone.name, respawnZone.id);
+        _silenceAllMusic();
+        STATE._activityMusicActive=false;STATE._pendingActivityTrack=undefined;
         STATE.tab="world";
         const hasFled=STATE._hasFled;
         STATE._hasFled=false;
@@ -13962,6 +14000,7 @@ function _handlePartyWsMessage(msg){
           _safeZoneHeal();
           saveGame(true);
           showEscapeScreen(()=>{
+            _updateZoneMusic(respawnZone.name, respawnZone.id);
             renderWorldNav();updateChatBar();
             setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);
           });
@@ -13974,7 +14013,7 @@ function _handlePartyWsMessage(msg){
           _safeZoneHeal();
           STATE.travelCooldown=60;startCooldownTicker();
           saveGame(true);
-          showDeathScreen(()=>{renderWorldNav();updateChatBar();setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);});
+          showDeathScreen(()=>{_updateZoneMusic(respawnZone.name, respawnZone.id);renderWorldNav();updateChatBar();setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);});
         }
         return; // skip the shared setTimeout below
       } else if(msg.outcome==="ejected"){
@@ -13983,6 +14022,7 @@ function _handlePartyWsMessage(msg){
         const respawnZone=ZONES.find(z=>z.id===respawnZoneId)||ZONES[0];
         STATE.zone=respawnZone;
         _updateZoneMusic(respawnZone.name, respawnZone.id);
+        STATE._activityMusicActive=false;STATE._pendingActivityTrack=undefined;
         STATE.tab="world";
         STATE._hasFled=false;
         updatePlayer(pp=>({...pp,energy:0,cooldowns:{},isAlive:true}));
@@ -14004,7 +14044,8 @@ function _handlePartyWsMessage(msg){
         const fleeRespawnId=msg.respawnZone||STATE.player.respawnZone||"safe_duskwatch";
         const fleeRespawnZone=ZONES.find(z=>z.id===fleeRespawnId)||ZONES[0];
         STATE.zone=fleeRespawnZone;
-        _updateZoneMusic(fleeRespawnZone.name, fleeRespawnZone.id);
+        _silenceAllMusic();
+        STATE._activityMusicActive=false;STATE._pendingActivityTrack=undefined;
         STATE.tab="world";
         STATE.player={...STATE.player,lastZone:fleeRespawnZone.id};
         addLog("info","Party escaped from combat.");
@@ -14014,6 +14055,7 @@ function _handlePartyWsMessage(msg){
         STATE.travelCooldown=60;startCooldownTicker();
         saveGame(true);
         showEscapeScreen(()=>{
+          _updateZoneMusic(fleeRespawnZone.name, fleeRespawnZone.id);
           renderWorldNav();updateChatBar();
           setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);
         });
@@ -14386,13 +14428,52 @@ function _updateZoneMusic(zoneName, zoneId){
   }
 }
 
+// Plays a one-off activity track (Explore, a Dungeon/Raid/Trial/Fishing subzone,
+// or an Arena mode) if one is configured. Unlike _updateZoneMusic this does
+// NOT touch anything when no track is set - the zone's ambient music (if any
+// is already playing) is simply left alone. Returns true if it actually
+// switched tracks, so the caller knows to revert to zone music once the
+// activity ends (see _revertActivityMusic).
+function _playActivityMusic(rawTrack){
+  const src=_resolveMusicSrc(rawTrack);
+  if(!src)return false;
+  const bgm=el("zone-bgm");
+  if(!bgm)return false;
+  bgm.pause();
+  bgm.src=src;
+  bgm.currentTime=0;
+  const _p=bgm.play();
+  if(_p&&_p.catch)_p.catch(()=>{});
+  return true;
+}
+// Call when an activity that switched music (via _playActivityMusic) ends
+// and the player is still in the same zone - restores the zone's own ambient
+// track (or silence, if it has none). Safe to call unconditionally; it only
+// does anything if STATE._activityMusicActive was actually set.
+function _revertActivityMusic(){
+  if(!STATE._activityMusicActive)return;
+  STATE._activityMusicActive=false;
+  if(STATE.zone)_updateZoneMusic(STATE.zone.name, STATE.zone.id);
+}
+
+// Stops everything - login theme and zone music - with no replacement.
+// Used at the moment a transition screen appears so nothing plays underneath
+// it; the appropriate track is started separately once that screen ends.
+function _silenceAllMusic(){
+  const loginBgm=el("login-bgm");
+  if(loginBgm){loginBgm.pause();loginBgm.currentTime=0;}
+  const bgm=el("zone-bgm");
+  if(bgm){bgm.pause();bgm.removeAttribute("src");bgm.currentTime=0;}
+}
+
 function showTravelScreen(zoneName, isSafe, onDone, zoneId){
   // Layer 1: destination name lock.
   // Drop any call that isn't for the locked destination zone.
   if(_travelDestName!==null && zoneName!==_travelDestName){ return; }
-  // Switch background music immediately - before any overlay animation - so it
-  // starts/stops in lockstep with the black travel screen appearing.
-  _updateZoneMusic(zoneName, zoneId);
+  // No music plays during the transition screen itself - silence immediately,
+  // then start the destination zone's track only once the screen fully ends
+  // (see the onDone call below).
+  _silenceAllMusic();
 
   // Layer 2: generation counter.
   // Increment the global generation. Every async callback spawned below captures
@@ -14414,7 +14495,7 @@ function showTravelScreen(zoneName, isSafe, onDone, zoneId){
   const particleEl = document.getElementById("tr-particles");
   const barWrap    = document.getElementById("tr-bar-wrap");
   const barFill    = document.getElementById("tr-bar-fill");
-  if(!overlay){ onDone(); return; }
+  if(!overlay){ _updateZoneMusic(zoneName, zoneId); onDone(); return; }
   const accentColor = isSafe ? "#44ee44" : "#ff4444";
   const glowAnim    = isSafe ? "tr-glow-safe" : "tr-glow-danger";
   const typeLabel   = isSafe ? "SAFE ZONE" : "DANGER ZONE";
@@ -14500,6 +14581,7 @@ function showTravelScreen(zoneName, isSafe, onDone, zoneId){
         overlay.style.display="none";
         if(particleEl) particleEl.innerHTML="";
         _travelDestName=null;
+        _updateZoneMusic(zoneName, zoneId);
         onDone();
       }, 500);
     }, 5000);
@@ -14753,7 +14835,7 @@ function renderWorldTab(content){
       fBtn.className="world-btn";
       fBtn.innerHTML=`<span style="pointer-events:none;-webkit-user-select:none;user-select:none;">${fcd>0?'Fishing ('+(fcd)+'s)':'Fishing'}</span>`;
       fBtn.disabled=(fcd>0);
-      fBtn.onclick=()=>openFishingMinigame(sz.name||null);
+      fBtn.onclick=()=>openFishingMinigame(sz.name||null, sz.music||null);
       body.appendChild(fBtn);
     } else if(z.hasFishing){
       // Legacy fallback: zone has hasFishing flag but no subzones array yet
@@ -15258,6 +15340,8 @@ async function _doExploreStart(z){
   saveGame();
   STATE.exploreCooldown=10;
   startCooldownTicker();
+  STATE._pendingActivityTrack=z.exploreMusic;
+  _silenceAllMusic();
   // If in party, signal members to enter combat
   if(_inParty()&&_isPartyLeader()){
     const combatTs=Date.now();
@@ -15282,6 +15366,8 @@ function _enterSubzone(sz, szType, szName){
       if(!result.ok){addLog("info",`${result.vetoedBy} voted no. Entry cancelled.`);return;}
     }
     // Show the combat transition with the type as title and name as subtitle
+    STATE._pendingActivityTrack=sz.music;
+    _silenceAllMusic();
     _showSubzoneCombatTransition(szName, szType);
     // Build member uid list
     const memberUids=_inParty()?[_myUid,...(STATE.party||[]).map(m=>m.uid).filter(Boolean)]:[_myUid];
@@ -15372,9 +15458,10 @@ const RARITY_ORDER={common:0,uncommon:1,rare:2,epic:3,legendary:4,mythic:5};
 // Active fishing subzone name — set when player taps a subzone fishing button, cleared on close
 let _activeFishingSubzoneName = null;
 
-function openFishingMinigame(subzoneName){
+function openFishingMinigame(subzoneName, track){
   if(STATE.fishCooldown>0||STATE.inCombat)return;
   _activeFishingSubzoneName = subzoneName || null;
+  STATE._activityMusicActive=_playActivityMusic(track);
   if(_fishState)_cancelFishRAF();
   const overlay=el("fishing-overlay");
   if(!overlay)return;
@@ -15396,6 +15483,7 @@ function _cancelFishRAF(){
 
 function _closeFishing(caught,fishId){
   if(!_fishState&&!document.getElementById("fish-caught-panel")&&!document.querySelector("#fishing-overlay.show"))return;
+  _revertActivityMusic();
   _cancelFishRAF();
   if(_partyWs&&_partyWs.readyState===1){
     _partyWs.send(JSON.stringify({type:"fish_cancel"}));
@@ -16831,7 +16919,17 @@ function _applyPartyDoc(d){
     _inviteQueueRunning=false;
     STATE.player={...STATE.player,energy:0};
     STATE.exploreCooldown=10;startCooldownTicker();
-    if(d.combatSignal.szType){_showSubzoneCombatTransition(d.combatSignal.szName||d.combatSignal.szType,d.combatSignal.szType);}else{showCombatTransition();}startCombat([]);
+    if(d.combatSignal.szType){
+      const _szObj=(STATE.zone&&Array.isArray(STATE.zone.subzones))?STATE.zone.subzones.find(s=>(s.name||s.type)===(d.combatSignal.szName||d.combatSignal.szType)):null;
+      STATE._pendingActivityTrack=_szObj&&_szObj.music;
+      _silenceAllMusic();
+      _showSubzoneCombatTransition(d.combatSignal.szName||d.combatSignal.szType,d.combatSignal.szType);
+    }else{
+      STATE._pendingActivityTrack=STATE.zone&&STATE.zone.exploreMusic;
+      _silenceAllMusic();
+      showCombatTransition();
+    }
+    startCombat([]);
   }
 }
 
@@ -19834,8 +19932,8 @@ function startGame(){
   _tbCache={gold:-1,hp:-1,maxHp:-1,zone:"",title:"",name:"",notifN:-1};_lastRenderedTab=null;
   activeLogTab="chat";
   _applyLogTabColors();
-  const lc=el("log-chat");const lb=el("log-combat");const lg=el("log-guild");const lp=el("log-party");const ls=el("log-system");const ldm=el("log-dm");
-  if(lc)lc.innerHTML="";if(lb)lb.innerHTML="";if(lg)lg.innerHTML="";if(lp)lp.innerHTML="";if(ls)ls.innerHTML="";if(ldm)ldm.innerHTML="";
+  const lc=el("log-chat");const lb=el("log-combat");const lg=el("log-guild");const lp=el("log-party");const ls=el("log-system");const ldm=el("log-dm");const lo=el("log-loot");
+  if(lc)lc.innerHTML="";if(lb)lb.innerHTML="";if(lg)lg.innerHTML="";if(lp)lp.innerHTML="";if(ls)ls.innerHTML="";if(ldm)ldm.innerHTML="";if(lo)lo.innerHTML="";
 
   // One-time DM check on login to catch messages that arrived while offline
   el("status-block").style.display="none";
@@ -19973,6 +20071,7 @@ function init(){
   el("log-tab-guild").addEventListener("pointerdown",e=>{e.preventDefault();switchLogTab("guild");});
   el("log-tab-system").addEventListener("pointerdown",e=>{e.preventDefault();switchLogTab("system");});
   el("log-tab-combat").addEventListener("pointerdown",e=>{e.preventDefault();switchLogTab("combat");});
+  el("log-tab-loot").addEventListener("pointerdown",e=>{e.preventDefault();switchLogTab("loot");});
   el("stats-btn").onclick=openStatsPopup;
   el("notif-btn").addEventListener("pointerup",function(e){e.preventDefault();_renderNotifPopup();el("notif-popup").classList.add("show");setCombatOverlaysVisible(false);});
   el("notif-close").onclick=()=>{el("notif-popup").classList.remove("show");setCombatOverlaysVisible(true);};
@@ -20608,7 +20707,7 @@ document.addEventListener("selectionchange",()=>{
 // The nuclear fix: preventDefault on touchstart kills long-press selection.
 // We allow it only on elements that are themselves scrollable (or inside a scroller).
 (function(){
-  const SCROLL_CLASSES=new Set(["tab-content","popup-body","fullpopup-body","log-chat","log-party","log-guild","log-system","log-combat","create-screen","create-body"]);
+  const SCROLL_CLASSES=new Set(["tab-content","popup-body","fullpopup-body","log-chat","log-party","log-guild","log-system","log-combat","log-loot","create-screen","create-body"]);
   function isInsideScroller(el){
     while(el&&el!==document.body){
       if(el.classList){for(const c of SCROLL_CLASSES)if(el.classList.contains(c)||el.id===c)return true;}
