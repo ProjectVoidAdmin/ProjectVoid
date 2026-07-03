@@ -5625,7 +5625,13 @@ function _devRenderForm(container,tab,formData){
     }
 
     var hintHtml=f.hint?'<div style="font-size:8px;color:#1e3a4a;margin-top:3px;line-height:1.4;">'+f.hint+'</div>':'';
-    return '<div class="dev-field-row">'
+    var showIfAttr='', showIfStyle='';
+    if(f.showIf){
+      var _curShowVal=formData[f.showIf.k]||'';
+      showIfAttr=' data-show-if-key="'+f.showIf.k+'" data-show-if-val="'+f.showIf.v+'"';
+      showIfStyle=(_curShowVal===f.showIf.v)?'':' style="display:none;"';
+    }
+    return '<div class="dev-field-row"'+showIfAttr+showIfStyle+'>'
       +'<div class="dev-field-label'+(f.req?' required':'')+'">'+f.l+'</div>'
       +inp+hintHtml
       +'</div>';
