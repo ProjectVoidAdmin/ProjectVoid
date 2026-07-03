@@ -14446,12 +14446,16 @@ function _playActivityMusic(rawTrack){
   if(_p&&_p.catch)_p.catch(()=>{});
   return true;
 }
-// Call when an activity that switched music (via _playActivityMusic) ends
-// and the player is still in the same zone - restores the zone's own ambient
-// track (or silence, if it has none). Safe to call unconditionally; it only
-// does anything if STATE._activityMusicActive was actually set.
+// Call when an activity (Explore/subzone/Arena/Fishing) ends and the player
+// is still in the same zone - restores the zone's own ambient track from the
+// beginning (or silence, if it has none). Safe to call unconditionally.
+// Always re-applies the zone's music: the activity start path calls
+// _silenceAllMusic() up front regardless of whether an activity track ends up
+// playing, so the zone's ambient track must always be explicitly restarted
+// here rather than only when STATE._activityMusicActive was set - otherwise
+// zones with no Explore/subzone/Arena track of their own would be left
+// silent after combat ends.
 function _revertActivityMusic(){
-  if(!STATE._activityMusicActive)return;
   STATE._activityMusicActive=false;
   if(STATE.zone)_updateZoneMusic(STATE.zone.name, STATE.zone.id);
 }
