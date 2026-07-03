@@ -274,7 +274,22 @@
       const WS_URL = 'wss://project-void-functions.fly.dev';
 
       enterBtn.addEventListener('click', (e) => {
-        if(enterBtn.classList.contains('disabled')) e.preventDefault();
+        if(enterBtn.classList.contains('disabled')){
+          e.preventDefault();
+          return;
+        }
+        e.preventDefault();
+        const destination = enterBtn.href;
+        const goToClient = () => { window.location.href = destination; };
+        const docEl = document.documentElement;
+        if(docEl.requestFullscreen){
+          docEl.requestFullscreen().catch(() => {}).finally(goToClient);
+        } else if(docEl.webkitRequestFullscreen){
+          try{ docEl.webkitRequestFullscreen(); }catch(err){}
+          goToClient();
+        } else {
+          goToClient();
+        }
       });
 
       function setOnline(){
