@@ -20324,14 +20324,8 @@ function init(){
   const _devlogOverlay=document.getElementById("devlog-overlay");
   const _devlogBtn=document.getElementById("devlog-continue");
   if(_devlogOverlay&&_devlogBtn){
-    // Fullscreen helper - called directly from devlog since stopPropagation blocks document listeners
-    function _devlogFS(){
-      if(document.fullscreenElement||document.webkitFullscreenElement)return;
-      if(window.matchMedia("(display-mode: standalone)").matches)return;
-      var el=document.documentElement;
-      if(el.requestFullscreen)el.requestFullscreen({navigationUI:"hide"}).catch(function(){});
-      else if(el.webkitRequestFullscreen)el.webkitRequestFullscreen();
-    }
+    // Fullscreen is now handled by the global document-level click listener
+    // (_forceFullscreen) instead of being triggered here directly.
     // Force touch scrolling to work inside devlog by stopping propagation
     _devlogOverlay.addEventListener("touchstart",function(e){e.stopPropagation();},{passive:true});
     _devlogOverlay.addEventListener("touchmove",function(e){e.stopPropagation();},{passive:true});
@@ -20351,11 +20345,8 @@ function init(){
       btn.classList.add("pressed");
       setTimeout(function(){btn.classList.remove("pressed");},220);
     }
-    _devlogBtn.addEventListener("pointerdown",function(e){
+    _devlogBtn.addEventListener("click",function(e){
       if(_devlogBtn.disabled)return;
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
       _devlogOverlay.style.transition="none";
       _devlogOverlay.style.opacity="0";
       _devlogOverlay.style.display="none";
@@ -20379,8 +20370,18 @@ function init(){
         }else if(_ls){
           _ls.classList.add("active");
         }
-        _devlogFS();
-    },{capture:true,passive:false});
+        // Don't stopPropagation/stopImmediatePropagation and don't call
+        // requestFullscreen() here ourselves - doing so from a pointerdown
+        // handler is what caused the "need to tap twice" bug: Android does
+        // not always treat pointerdown as valid user-activation for the
+        // Fullscreen API, and a rejected/stalled fullscreen request can
+        // freeze the visual frame even though the DOM already updated
+        // underneath, until a second tap forces a repaint. Instead let this
+        // event bubble naturally to the document-level click/pointerdown
+        // handler (_forceFullscreen), which uses the more reliable "click"
+        // activation and already checks devlog-overlay's display state.
+    },{passive:true});
+
     // Tab switching
     const _tabCrucible=document.getElementById("devlog-tab-crucible");
     const _tabWatcher=document.getElementById("devlog-tab-watcher");
