@@ -1346,11 +1346,46 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 
 <!-- ═══════════════════════════════════ DEVLOG ═══════════════════════════════════ -->
 <div id="devlog-overlay" style="position:fixed;inset:0;z-index:10000;background:#050505;overflow-y:scroll!important;-webkit-overflow-scrolling:touch;touch-action:pan-y!important;display:flex;flex-direction:column;align-items:center;">
+<div class="dl-nebula"></div>
+<div class="dl-stars dl-stars-1"></div>
+<div class="dl-stars dl-stars-2"></div>
+<div class="dl-stars dl-stars-3"></div>
 <style>
 #devlog-overlay{overflow-y:scroll!important;touch-action:pan-y!important;overscroll-behavior:contain;}
 #devlog-overlay *{box-sizing:border-box;touch-action:pan-y!important;-webkit-tap-highlight-color:transparent!important;-webkit-user-select:none!important;user-select:none!important;}
 #devlog-overlay::-webkit-scrollbar{display:none;}
 #devlog-overlay{scrollbar-width:none;}
+.dl-nebula{position:fixed;inset:-20%;width:140%;height:140%;pointer-events:none;z-index:0;background:radial-gradient(circle at 30% 20%,rgba(139,92,246,0.20),transparent 40%);filter:blur(2px);animation:dlNebulaDrift 50s ease-in-out infinite alternate;}
+@keyframes dlNebulaDrift{0%{transform:translate(0,0) scale(1);}100%{transform:translate(4%,-4%) scale(1.08);}}
+.dl-stars{position:fixed;inset:-15%;width:130%;height:130%;pointer-events:none;z-index:0;background-repeat:repeat;will-change:transform;}
+.dl-stars-1{
+  background-image:radial-gradient(0.9px 0.9px at 30px 40px,#fff,transparent),radial-gradient(0.7px 0.7px at 90px 110px,#fff,transparent),radial-gradient(1px 1px at 150px 20px,#fff,transparent),radial-gradient(0.7px 0.7px at 210px 160px,#fff,transparent),radial-gradient(0.9px 0.9px at 250px 70px,#fff,transparent),radial-gradient(0.7px 0.7px at 45px 190px,#fff,transparent),radial-gradient(1px 1px at 190px 250px,#fff,transparent),radial-gradient(0.7px 0.7px at 270px 220px,#fff,transparent),radial-gradient(0.8px 0.8px at 110px 260px,#fff,transparent),radial-gradient(0.7px 0.7px at 15px 280px,#fff,transparent);
+  background-size:300px 300px;
+  opacity:0.45;
+  animation:dlStarDrift1 200s linear infinite,dlTwinkleA 5s ease-in-out infinite alternate;
+}
+.dl-stars-2{
+  background-image:radial-gradient(1.3px 1.3px at 60px 80px,#fff,transparent),radial-gradient(1px 1px at 160px 190px,#fff,transparent),radial-gradient(1.5px 1.5px at 260px 40px,#fff,transparent),radial-gradient(1px 1px at 340px 250px,#fff,transparent),radial-gradient(1.3px 1.3px at 420px 120px,#fff,transparent),radial-gradient(1px 1px at 80px 300px,#fff,transparent),radial-gradient(1.5px 1.5px at 460px 340px,#fff,transparent),radial-gradient(1px 1px at 230px 330px,#fff,transparent);
+  background-size:500px 500px;
+  background-position:180px 260px;
+  opacity:0.6;
+  animation:dlStarDrift2 110s linear infinite,dlTwinkleB 6.5s ease-in-out infinite alternate;
+  animation-delay:0s,-2s;
+}
+.dl-stars-3{
+  background-image:radial-gradient(2px 2px at 100px 130px,#fff,transparent),radial-gradient(1.8px 1.8px at 260px 300px,#fff,transparent),radial-gradient(2.4px 2.4px at 420px 70px,#fff,transparent),radial-gradient(1.8px 1.8px at 560px 400px,#fff,transparent),radial-gradient(2px 2px at 130px 460px,#fff,transparent),radial-gradient(2.4px 2.4px at 620px 220px,#fff,transparent);
+  background-size:700px 700px;
+  background-position:420px 90px;
+  opacity:0.85;
+  animation:dlStarDrift3 55s linear infinite,dlTwinkleC 4s ease-in-out infinite alternate;
+  animation-delay:0s,-1s;
+}
+@keyframes dlStarDrift1{from{transform:translate3d(0,0,0);}to{transform:translate3d(-300px,300px,0);}}
+@keyframes dlStarDrift2{from{transform:translate3d(0,0,0);}to{transform:translate3d(-500px,500px,0);}}
+@keyframes dlStarDrift3{from{transform:translate3d(0,0,0);}to{transform:translate3d(-700px,700px,0);}}
+@keyframes dlTwinkleA{0%{opacity:0.25;}100%{opacity:0.5;}}
+@keyframes dlTwinkleB{0%{opacity:0.4;}100%{opacity:0.7;}}
+@keyframes dlTwinkleC{0%{opacity:0.6;}100%{opacity:0.95;}}
 @keyframes dlGlitch{0%,100%{text-shadow:2px 0 #ff0040,-2px 0 #00ffcc;}20%{text-shadow:-3px 0 #ff0040,3px 0 #00ffcc;}40%{text-shadow:3px 0 #ff0040,-3px 0 #00ffcc;}60%{text-shadow:-2px 0 #ff0040,2px 0 #00ffcc;}80%{text-shadow:1px 0 #ff0040,-1px 0 #00ffcc;}}
 @keyframes dlFadeUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
 @keyframes dlPulse{0%,100%{box-shadow:0 0 15px rgba(204,32,32,0.2);}50%{box-shadow:0 0 30px rgba(204,32,32,0.4);}}
@@ -1382,7 +1417,7 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 .dl-eye-wrap.glitching .dl-eye-svg{animation:none!important;}
 .dl-eye-glitch-clone{position:absolute;inset:0;pointer-events:none;opacity:0;}
 .dl-eye-wrap.glitching .dl-eye-glitch-clone{opacity:1;}
-.dl-c{max-width:430px;width:100%;padding:20px 16px 40px;font-family:'Courier New',monospace;}
+.dl-c{max-width:430px;width:100%;padding:20px 16px 40px;font-family:'Courier New',monospace;position:relative;z-index:1;}
 .dl-hdr{text-align:center;padding:16px 0 16px;animation:dlFadeUp 0.8s ease both;}
 .dl-hdr::before{display:none;}
 .dl-tag{font-size:10px;letter-spacing:4px;color:#cc8800;padding:3px 10px;border:1px solid rgba(204,136,0,0.3);display:inline-block;}
@@ -1414,9 +1449,12 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 .dl-ft{text-align:center;margin-top:20px;}
 .dl-ft-t{font-size:10px;color:#666;letter-spacing:3px;}
 .dl-ft-s{font-size:12px;color:#998855;margin-top:6px;font-style:italic;}
-.dl-enter{display:block;width:100%;margin-top:14px;padding:16px;background:transparent;border:2px solid #555;border-radius:4px;color:#555;font-family:'Courier New',monospace;font-size:14px;letter-spacing:4px;text-transform:uppercase;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background 0.2s,color 0.2s;}
-.dl-enter:active{background:rgba(255,255,255,0.05);}
-.dl-enter.pressed{}
+.dl-enter{display:block;width:100%;margin-top:14px;padding:16px;background:linear-gradient(90deg,#2dd4bf,#6366f1,#8b5cf6,#6366f1,#2dd4bf);background-size:300% 100%;border:none;border-radius:8px;color:#0a0a0a;font-family:Arial,Helvetica,sans-serif;font-weight:800;font-size:16px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 0 24px rgba(139,92,246,0.35);transition:transform 0.15s ease,box-shadow 0.15s ease,opacity 0.3s ease;animation:dlEnterFlow 6s linear infinite;}
+.dl-enter:disabled{opacity:0.18!important;cursor:not-allowed;box-shadow:none!important;animation-play-state:paused;pointer-events:none;}
+.dl-enter:active{transform:scale(0.98);box-shadow:0 0 14px rgba(139,92,246,0.25);}
+@keyframes dlEnterFlow{0%{background-position:0% 50%;}100%{background-position:300% 50%;}}
+.dl-enter-arrow{display:inline-block;margin-left:6px;transition:transform 0.2s ease;}
+.dl-enter:active .dl-enter-arrow{transform:translateX(3px);}
 @keyframes dl13BtnPulse{0%,100%{box-shadow:0 0 15px rgba(204,136,0,0.2);}50%{box-shadow:0 0 30px rgba(204,136,0,0.4);}}
 #devlog-tab-crucible,#devlog-tab-watcher,#devlog-tab-world{outline:none!important;-webkit-tap-highlight-color:rgba(0,0,0,0)!important;-webkit-text-fill-color:currentColor!important;}
 #devlog-tab-crucible:focus,#devlog-tab-crucible:active,#devlog-tab-crucible:hover,
@@ -1425,14 +1463,32 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 #devlog-tab-server:focus,#devlog-tab-server:active,#devlog-tab-server:hover{outline:none!important;-webkit-text-fill-color:currentColor!important;background:none!important;-webkit-appearance:none!important;opacity:1!important;}
 
 #devlog-overlay button,#devlog-overlay label{-webkit-tap-highlight-color:rgba(0,0,0,0)!important;-webkit-user-select:none;user-select:none;}
-#devlog-overlay button:focus,#devlog-overlay button:active{outline:none!important;-webkit-text-fill-color:currentColor!important;background:none!important;}
+#devlog-overlay button:focus:not(.dl-enter),#devlog-overlay button:active:not(.dl-enter){outline:none!important;-webkit-text-fill-color:currentColor!important;background:none!important;}
+#devlog-overlay button.dl-enter:focus,#devlog-overlay button.dl-enter:active{outline:none!important;}
 </style>
 <div class="dl-c">
   <!-- PATCH 1.3 starts immediately - no eye -->
   <!-- Tab header -->
   <div style="text-align:center;padding:20px 0 4px;">
-    <div style="font-size:22px;color:#fff;letter-spacing:8px;font-family:'Courier New',monospace;font-weight:bold;">PROJECT VOID</div>
-    <div id="devlog-server-status" style="font-size:10px;letter-spacing:3px;font-family:'Courier New',monospace;margin-top:6px;color:#888;">CHECKING&hellip;</div>
+    <style>
+    @keyframes pvFadeUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+    @keyframes pvGlowPulse{0%,100%{filter:drop-shadow(0 0 18px rgba(139,92,246,0.45));}50%{filter:drop-shadow(0 0 30px rgba(139,92,246,0.75));}}
+    .pv-anim{opacity:0;animation:pvFadeUp 0.9s cubic-bezier(0.16,1,0.3,1) forwards;}
+    .pv-d0{animation-delay:0.05s;}
+    .pv-d1{animation-delay:0.25s;}
+    .pv-d2{animation-delay:0.75s;}
+    .pv-d3{animation-delay:0.95s;}
+    .pv-d4{animation-delay:1.15s;}
+    .pv-d5{animation-delay:1.35s;}
+    .pv-title-wrap{position:relative;opacity:0;animation:pvFadeUp 0.01s linear 0.24s forwards;}
+    .pv-title-wrap::before{content:"";position:absolute;left:50%;top:50%;width:340px;height:220px;transform:translate(-50%,-50%);background:radial-gradient(ellipse at center,rgba(139,92,246,0.20) 0%,rgba(139,92,246,0.07) 45%,transparent 75%);filter:blur(6px);z-index:0;pointer-events:none;}
+    .pv-line{position:relative;z-index:1;display:block;font-style:italic;transform:skewX(-6deg);opacity:0;animation:pvFadeUp 1s cubic-bezier(0.16,1,0.3,1) forwards,pvGlowPulse 4s ease-in-out infinite;}
+    .pv-line-1{animation-delay:0.3s,1.1s;}
+    .pv-line-2{animation-delay:0.45s,1.1s;}
+    </style>
+    <div style="font-size:10px;color:#fff;letter-spacing:5px;font-family:'Courier New',monospace;margin-bottom:8px;" class="pv-anim pv-d0">BROWSER-BASED MMORPG</div>
+    <div class="pv-title-wrap" style="font-size:38px;line-height:1;font-family:Arial,Helvetica,sans-serif;font-weight:900;letter-spacing:1px;text-transform:uppercase;"><span class="pv-line pv-line-1" style="background:linear-gradient(180deg,#ffffff 0%,#ffffff 40%,#8b5cf6 100%);-webkit-background-clip:text;background-clip:text;color:transparent;">PROJECT</span><span class="pv-line pv-line-2" style="background:linear-gradient(180deg,#c4b5fd 0%,#8b5cf6 55%,#7c3aed 100%);-webkit-background-clip:text;background-clip:text;color:transparent;">VOID</span></div>
+    <div id="devlog-server-status" class="pv-anim pv-d2" style="font-size:10px;letter-spacing:3px;font-family:'Courier New',monospace;margin-top:6px;color:#888;">CHECKING&hellip;</div>
     <script>
     (function(){
       var el = document.getElementById('devlog-server-status');
@@ -1443,10 +1499,14 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
       function setOnline(){
         el.textContent = "SERVER ONLINE";
         el.style.color = "#44ee44";
+        var btn = document.getElementById('devlog-continue');
+        if(btn){ btn.disabled = false; btn.style.display = "block"; }
       }
       function setOffline(){
         el.textContent = "SERVER OFFLINE";
         el.style.color = "#ff3333";
+        var btn = document.getElementById('devlog-continue');
+        if(btn){ btn.disabled = true; btn.style.display = "none"; }
       }
       var timeout = setTimeout(function(){
         if(settled) return;
@@ -1475,9 +1535,10 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
       }
     })();
     </script>
+    <button class="dl-enter pv-anim pv-d3" id="devlog-continue" disabled style="display:none;max-width:320px;margin-left:auto;margin-right:auto;animation:pvFadeUp 0.9s cubic-bezier(0.16,1,0.3,1) 0.95s forwards,dlEnterFlow 6s linear infinite;">ENTER</button>
   </div>
   <!-- Tab row -->
-  <div style="display:flex;flex-direction:column;gap:8px;align-items:center;padding:12px 0 16px;">
+  <div class="pv-anim pv-d4" style="display:flex;flex-direction:column;gap:8px;align-items:center;padding:12px 0 16px;">
     <div style="display:flex;gap:8px;justify-content:center;width:100%;">
       <button id="devlog-tab-crucible" style="flex:1;max-width:160px;background:none;border:1px solid rgba(204,32,32,0.3);border-radius:4px;color:#663333;font-size:9px;letter-spacing:2px;font-family:'Courier New',monospace;padding:4px 6px;cursor:pointer;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;text-align:center;line-height:1.3;">PVP</button>
       <button id="devlog-tab-watcher" style="flex:1;max-width:160px;background:none;border:1px solid rgba(204,136,0,0.3);border-radius:4px;color:#664400;font-size:9px;letter-spacing:2px;font-family:'Courier New',monospace;padding:4px 6px;cursor:pointer;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;text-align:center;line-height:1.3;">ANTI-CHEAT</button>
@@ -1488,7 +1549,7 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   <!-- Tab divider line (changes color with active tab) -->
   <div id="devlog-tab-divider" style="width:100%;height:1px;background:linear-gradient(90deg,transparent,#fff 50%,transparent);opacity:0.2;margin-bottom:4px;"></div>
   <!-- Alpha notice (visible only when no tab selected) -->
-  <div id="devlog-alpha-notice" style="text-align:center;padding:14px 16px 14px;max-width:360px;margin:0 auto;">
+  <div id="devlog-alpha-notice" class="pv-anim pv-d5" style="text-align:center;padding:14px 16px 14px;max-width:360px;margin:0 auto;">
     <div style="font-size:9px;letter-spacing:3px;color:#555;font-family:'Courier New',monospace;border:1px solid #333;display:inline-block;padding:3px 10px;border-radius:2px;margin-bottom:12px;">EARLY ACCESS</div>
     <div style="font-size:11px;color:#666;font-family:'Courier New',monospace;line-height:1.7;letter-spacing:0.5px;">Project Void is currently in alpha. The game is under active development and you may experience server restarts, temporary downtime, and occasional bugs as new features are deployed. Thank you for being part of the process.</div>
   </div>
@@ -1643,7 +1704,6 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   </div>
   <!-- Game Server content (hidden by default) -->
 
-  <button class="dl-enter" id="devlog-continue" style="border-color:#555;color:#555;">LAUNCH</button>
   <div style="padding-bottom:20px;"></div>
 </div>
 </div>
@@ -2176,6 +2236,8 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   }
   window._lockPortrait=_lockPortrait;
   function _forceFullscreen(){
+    var _dlOv=document.getElementById("devlog-overlay");
+    if(_dlOv&&_dlOv.style.display!=="none")return;
     if(document.fullscreenElement||document.webkitFullscreenElement){_lockPortrait();return;}
     if(window.matchMedia("(display-mode: standalone)").matches){_lockPortrait();return;}
     var el=document.documentElement;
@@ -20271,11 +20333,10 @@ function init(){
       else if(el.webkitRequestFullscreen)el.webkitRequestFullscreen();
     }
     // Force touch scrolling to work inside devlog by stopping propagation
-    _devlogOverlay.addEventListener("touchstart",function(e){_devlogFS();e.stopPropagation();},{passive:true});
+    _devlogOverlay.addEventListener("touchstart",function(e){e.stopPropagation();},{passive:true});
     _devlogOverlay.addEventListener("touchmove",function(e){e.stopPropagation();},{passive:true});
     _devlogOverlay.addEventListener("touchend",function(e){e.stopPropagation();},{passive:true});
     _devlogOverlay.addEventListener("pointerdown",function(e){
-      _devlogFS();
       if(e.target.closest("#devlog-continue")||e.target.closest("#devlog-tab-crucible")||e.target.closest("#devlog-tab-watcher")||e.target.closest("#devlog-tab-world"))return;
       e.stopPropagation();
     },{passive:true});
@@ -20291,6 +20352,7 @@ function init(){
       setTimeout(function(){btn.classList.remove("pressed");},220);
     }
     _devlogBtn.addEventListener("pointerdown",function(e){
+      if(_devlogBtn.disabled)return;
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
@@ -20307,18 +20369,17 @@ function init(){
           const _toggleB=document.getElementById("login-toggle-btn");if(_toggleB)_toggleB.textContent="Create New Account";
           const _pcw=document.getElementById("confirm-pw-wrap");if(_pcw)_pcw.style.display="none";
         }
-        if(_ls){
-          _ls.classList.remove("li-paused");
-          ["li-title","li-sub","li-form"].forEach(function(id){
-            const _el=document.getElementById(id);
-            if(!_el)return;
-            _el.style.animation="none";
-            void _el.offsetWidth;
-            _el.style.animation="";
-          });
-          const _div=document.getElementById("li-divider");
-          if(_div){_div.style.animation="none";void _div.offsetWidth;_div.style.animation="";}
+        if(_ls)_ls.classList.remove("li-paused");
+        // Immediately bring login-screen to the front (adds the "active" class
+        // that actually makes a .screen visible - without this it stayed hidden
+        // until some later interaction happened to trigger it, causing the
+        // "have to click twice" bug)
+        if(typeof showScreen==="function"){
+          showScreen("login-screen");
+        }else if(_ls){
+          _ls.classList.add("active");
         }
+        _devlogFS();
     },{capture:true,passive:false});
     // Tab switching
     const _tabCrucible=document.getElementById("devlog-tab-crucible");
@@ -20343,17 +20404,14 @@ function init(){
         _crucibleContent.style.display="block";
         _tabCrucible.style.border="2px solid #cc2020";_tabCrucible.style.color="#cc2020";_tabCrucible.style.setProperty("-webkit-text-fill-color","#cc2020","important");
         _tabDivider.style.background="linear-gradient(90deg,transparent,#cc2020 50%,transparent)";_tabDivider.style.opacity="0.5";
-        _enterBtn.style.borderColor="#cc2020";_enterBtn.style.color="#cc2020";
       } else if(tab==="watcher"){
         _watcherContent.style.display="block";
         _tabWatcher.style.border="2px solid #cc8800";_tabWatcher.style.color="#cc8800";_tabWatcher.style.setProperty("-webkit-text-fill-color","#cc8800","important");
         _tabDivider.style.background="linear-gradient(90deg,transparent,#cc8800 50%,transparent)";_tabDivider.style.opacity="0.5";
-        _enterBtn.style.borderColor="#cc8800";_enterBtn.style.color="#cc8800";
       } else if(tab==="world"){
         _worldContent.style.display="block";
         _tabWorld.style.border="2px solid #44ee44";_tabWorld.style.color="#44ee44";_tabWorld.style.setProperty("-webkit-text-fill-color","#44ee44","important");
         _tabDivider.style.background="linear-gradient(90deg,transparent,#44ee44 50%,transparent)";_tabDivider.style.opacity="0.5";
-        _enterBtn.style.borderColor="#44ee44";_enterBtn.style.color="#44ee44";
       }
       _devlogOverlay.scrollTop=0;
     }
