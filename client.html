@@ -1710,6 +1710,7 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 
 <!-- ═══════════════════════════════════ LOGIN ═══════════════════════════════════ -->
 <div id="login-screen" class="screen li-paused">
+  <audio id="login-bgm" src="music/Login.mp3" loop preload="auto"></audio>
   <div id="li-scanline"></div>
   <div class="login-box" style="padding:24px;">
     <div id="li-title">PROJECT<br>VOID</div>
@@ -4015,6 +4016,23 @@ function showScreen(id){
   if(!_screens)_screens=Array.from(document.querySelectorAll(".screen"));
   _screens.forEach(s=>s.classList.remove("active"));
   el(id).classList.add("active");
+  // Login screen background music: play while login-screen is active, stop otherwise.
+  const _bgm=el("login-bgm");
+  if(_bgm){
+    if(id==="login-screen"){
+      _bgm.currentTime=0;
+      const _p=_bgm.play();
+      if(_p&&_p.catch)_p.catch(()=>{
+        // Autoplay was blocked (no prior user gesture) — start on first interaction instead.
+        const _resume=()=>{ _bgm.play().catch(()=>{}); document.removeEventListener("pointerdown",_resume); document.removeEventListener("keydown",_resume); };
+        document.addEventListener("pointerdown",_resume,{once:true});
+        document.addEventListener("keydown",_resume,{once:true});
+      });
+    } else {
+      _bgm.pause();
+      _bgm.currentTime=0;
+    }
+  }
   const animEls={
     "create-screen":["ci-welcome","ci-title","ci-subtitle","ci-tagline","ci-form"],
     "login-screen":["li-title","li-sub","li-divider","li-form"]
