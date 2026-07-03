@@ -1432,7 +1432,49 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   <!-- Tab header -->
   <div style="text-align:center;padding:20px 0 4px;">
     <div style="font-size:22px;color:#fff;letter-spacing:8px;font-family:'Courier New',monospace;font-weight:bold;">PROJECT VOID</div>
-    <div style="font-size:10px;color:#888;letter-spacing:3px;font-family:'Courier New',monospace;margin-top:6px;">DEVELOPER LOGS</div>
+    <div id="devlog-server-status" style="font-size:10px;letter-spacing:3px;font-family:'Courier New',monospace;margin-top:6px;color:#888;">CHECKING&hellip;</div>
+    <script>
+    (function(){
+      var el = document.getElementById('devlog-server-status');
+      if(!el) return;
+      var WS_TEST_URL = (typeof WS_URL !== "undefined") ? WS_URL : "wss://project-void-functions.fly.dev";
+      var settled = false;
+      var ws;
+      function setOnline(){
+        el.textContent = "SERVER ONLINE";
+        el.style.color = "#44ee44";
+      }
+      function setOffline(){
+        el.textContent = "SERVER OFFLINE";
+        el.style.color = "#ff3333";
+      }
+      var timeout = setTimeout(function(){
+        if(settled) return;
+        settled = true;
+        setOffline();
+        if(ws){ try{ ws.close(); }catch(e){} }
+      }, 6000);
+      try{
+        ws = new WebSocket(WS_TEST_URL);
+        ws.onopen = function(){
+          if(settled) return;
+          settled = true;
+          clearTimeout(timeout);
+          setOnline();
+          try{ ws.close(); }catch(e){}
+        };
+        ws.onerror = function(){
+          if(settled) return;
+          settled = true;
+          clearTimeout(timeout);
+          setOffline();
+        };
+      }catch(e){
+        clearTimeout(timeout);
+        setOffline();
+      }
+    })();
+    </script>
   </div>
   <!-- Tab row -->
   <div style="display:flex;flex-direction:column;gap:8px;align-items:center;padding:12px 0 16px;">
