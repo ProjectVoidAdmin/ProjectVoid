@@ -39,8 +39,8 @@ input{font-family:'Courier New',monospace;}
 .screen{display:none!important;flex-direction:column;height:100%;overflow:hidden;min-height:0;}
 .screen.active{display:flex!important;}
 /* Login */
-#login-screen{align-items:center;justify-content:center;background:linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.75)),url("background/Login.png") center/cover no-repeat,#000;overflow:hidden;position:relative;}
-.login-box{width:100%;max-width:360px;position:relative;z-index:1;transition:none;margin-top:-8vh;}
+#login-screen{align-items:center;justify-content:center;background:#000;background-size:cover;background-position:center;background-repeat:no-repeat;overflow:hidden;position:relative;}
+.login-box{width:100%;max-width:360px;position:relative;z-index:2;transition:none;margin-top:-8vh;}
 #li-scanline,#ci-scanline{display:none;}
 #li-title{font-size:32px;font-weight:bold;letter-spacing:8px;color:#fff;font-family:'Courier New',monospace;text-align:center;opacity:0;animation:ci-flicker 1.4s ease 0.3s forwards,ci-glow 4s ease 1.8s infinite,ci-glitch 9s ease 2.5s infinite;line-height:1.15;}
 #li-sub{font-size:9px;letter-spacing:5px;color:#444;font-family:'Courier New',monospace;text-align:center;opacity:0;animation:ci-fadein 0.8s ease 1.8s forwards,ci-glitch2 11s ease 4s infinite;margin-top:4px;margin-bottom:0;}
@@ -1711,6 +1711,8 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 <!-- ═══════════════════════════════════ LOGIN ═══════════════════════════════════ -->
 <div id="login-screen" class="screen li-paused">
   <audio id="login-bgm" src="music/Login.mp3" loop preload="auto"></audio>
+  <video id="login-bg-video" muted loop playsinline autoplay style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;"></video>
+  <div id="login-bg-overlay" style="position:absolute;inset:0;background:linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.75));z-index:1;pointer-events:none;"></div>
   <div id="li-scanline"></div>
   <div class="login-box" style="padding:24px;">
     <div id="li-title">PROJECT<br>VOID</div>
@@ -4018,6 +4020,35 @@ async function openCharSheetPopup(name, username, onClose){
 }
 
 // ========================================
+//  LOGIN SCREEN BACKGROUND (video, with image fallback)
+// ========================================
+// Both are optional. If a video is present it's preferred and plays on loop;
+// the image is applied underneath as the background either way, so it shows
+// through automatically the instant the video fails to load (wrong filename,
+// unsupported format, slow/broken connection, etc.) - no manual switching.
+// To go image-only, just leave LOGIN_BG_VIDEO blank ("").
+const LOGIN_BG_VIDEO="background/Login.mp4";
+const LOGIN_BG_IMAGE="background/Login.png";
+(function _setupLoginBackground(){
+  const ls=document.getElementById("login-screen");
+  const vid=document.getElementById("login-bg-video");
+  if(!ls)return;
+  // Image goes on first as the base layer/fallback - always applied if set,
+  // regardless of whether the video ends up working.
+  if(LOGIN_BG_IMAGE) ls.style.backgroundImage=`url("${LOGIN_BG_IMAGE}")`;
+  if(LOGIN_BG_VIDEO&&vid){
+    vid.addEventListener("error",()=>{
+      // Video missing/unsupported - hide it so the image underneath shows.
+      vid.style.display="none";
+    });
+    vid.src=LOGIN_BG_VIDEO;
+    vid.style.display="block";
+  } else if(vid){
+    vid.style.display="none";
+  }
+})();
+
+// ========================================
 //  SCREEN SWITCHING
 // ========================================
 let _screens=null;
@@ -4040,6 +4071,21 @@ function showScreen(id){
     } else {
       _bgm.pause();
       _bgm.currentTime=0;
+    }
+  }
+  // Login screen background video (only relevant if LOGIN_BG_SRC resolved to a video) —
+  // same play-while-active / pause-otherwise pattern as the bgm above.
+  const _bgVid=el("login-bg-video");
+  if(_bgVid&&_bgVid.style.display==="block"){
+    if(id==="login-screen"){
+      const _pv=_bgVid.play();
+      if(_pv&&_pv.catch)_pv.catch(()=>{
+        const _resumeV=()=>{ _bgVid.play().catch(()=>{}); document.removeEventListener("pointerdown",_resumeV); document.removeEventListener("keydown",_resumeV); };
+        document.addEventListener("pointerdown",_resumeV,{once:true});
+        document.addEventListener("keydown",_resumeV,{once:true});
+      });
+    } else {
+      _bgVid.pause();
     }
   }
   const animEls={
@@ -4654,6 +4700,14 @@ function confirmLogout(){
   document.body.appendChild(ov);
 }
 function doLogout(){
+  // Stop all music immediately - don't rely on the page reload below to kill
+  // it, since the 300ms fade-out (and reload itself, on a slow connection)
+  // would otherwise leave zone/boss/login music audibly playing behind it.
+  _silenceAllMusic();
+  STATE._activityMusicActive=false;
+  STATE._pendingActivityTrack=undefined;
+  const _lbv=document.getElementById("login-bg-video");
+  if(_lbv){_lbv.pause();}
   // Reset deferred data flag so next login re-fetches
   _deferredDataLoaded=false;_deferredDataPending=false;
   // Force save social data before logout - bypass sig check
@@ -13647,7 +13701,7 @@ function _handlePartyWsMessage(msg){
       // uninterrupted through the transition, same as any normal level advance.
       {
         const _szForMusic=(STATE.zone&&Array.isArray(STATE.zone.subzones))
-          ?STATE.zone.subzones.find(s=>(s.name||s.type)===(msg.subzoneName||msg.subzoneType))
+          ?STATE.zone.subzones.find(s=>(s.name||s.type)===(msg.subzoneName||msg.subzoneType)&&(!msg.subzoneType||s.type===msg.subzoneType))
           :null;
         const _nextLvlObj=(_szForMusic&&Array.isArray(_szForMusic._levels))?_szForMusic._levels[(msg.nextLevel||1)-1]:null;
         if(_nextLvlObj&&_nextLvlObj.isBoss&&_nextLvlObj.bossMusic){
