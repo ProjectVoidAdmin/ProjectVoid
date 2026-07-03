@@ -1904,6 +1904,7 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 @keyframes caught-badge-in{0%{opacity:0;transform:scale(0.5);}70%{transform:scale(1.12);}100%{opacity:1;transform:scale(1);}}
 @keyframes caught-glow-pulse{0%,100%{box-shadow:0 0 20px rgba(100,160,255,0.15),0 0 60px rgba(60,110,200,0.08);}50%{box-shadow:0 0 40px rgba(120,180,255,0.28),0 0 90px rgba(80,130,220,0.18);}}
 </style>
+<audio id="zone-bgm" loop preload="auto"></audio>
 <div id="travel-overlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:#000;opacity:0;pointer-events:none;z-index:9998;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;">
   <!-- Scanline -->
   <div id="tr-scanline" style="display:none;"></div>
@@ -14345,10 +14346,42 @@ function _showTravelOverlay(){
   if(_pc){_pc.innerHTML="";}
 }
 
+// Zone background music. Keyed by zone display name (matches the .name shown
+// on the travel screen). Add more zone:file pairs here as tracks are produced.
+const ZONE_MUSIC={
+  "Duskwatch":"music/Duskwatch.mp3",
+  "Goblin Forest":"music/GoblinForest.mp3"
+};
+// Immediately stops whatever is currently playing (login theme or a previous
+// zone's track) and starts the track for the destination zone, if one exists.
+// Called at the top of showTravelScreen so it fires the instant a real travel
+// (not a dropped/duplicate call) is committed - covers manual travel, party
+// follow/sync travel, and the post-login/character-creation zone load.
+function _updateZoneMusic(zoneName){
+  const loginBgm=el("login-bgm");
+  if(loginBgm){loginBgm.pause();loginBgm.currentTime=0;}
+  const bgm=el("zone-bgm");
+  if(!bgm)return;
+  bgm.pause();
+  const src=ZONE_MUSIC[zoneName];
+  if(src){
+    bgm.src=src;
+    bgm.currentTime=0;
+    const _p=bgm.play();
+    if(_p&&_p.catch)_p.catch(()=>{});
+  } else {
+    bgm.removeAttribute("src");
+    bgm.currentTime=0;
+  }
+}
+
 function showTravelScreen(zoneName, isSafe, onDone){
   // Layer 1: destination name lock.
   // Drop any call that isn't for the locked destination zone.
   if(_travelDestName!==null && zoneName!==_travelDestName){ return; }
+  // Switch background music immediately - before any overlay animation - so it
+  // starts/stops in lockstep with the black travel screen appearing.
+  _updateZoneMusic(zoneName);
 
   // Layer 2: generation counter.
   // Increment the global generation. Every async callback spawned below captures
