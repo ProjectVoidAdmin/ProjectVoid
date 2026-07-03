@@ -4927,6 +4927,7 @@ var _DEV_FIELDS = {
     {k:'zoneNumber',   l:'Zone Number',   t:'number', req:true, ph:'e.g. 1'},
     {k:'rarity',       l:'Rarity',        t:'select', req:true, opts:['Common','Uncommon','Rare','Epic','Legendary','Mythic']},
     {k:'respawnRule',  l:'Type',          t:'select', req:true, opts:['Safe','Danger']},
+    {k:'music',        l:'Music Track',   t:'text', ph:'e.g. Duskwatch.mp3 (uploaded to /music) — leave blank for none'},
     {k:'_market',      l:'Market',        t:'marketbox',   showIf:{k:'respawnRule',v:'Safe'}},
     {k:'_assignments', l:'Hostiles',      t:'assignmentsbox', showIf:{k:'respawnRule',v:'Danger'}},
     {k:'_subzones',    l:'Subzones',      t:'subzonesbox'},
@@ -12586,6 +12587,7 @@ function _handlePartyWsMessage(msg){
           rarity:z.rarity||"common",
           description:z.description||"",
           zoneNumber:z.zoneNumber!=null?Number(z.zoneNumber):null,
+          music:z.music||"",
           _live:true,
         };
         if(existing>=0)ZONES[existing]=merged;
@@ -13926,6 +13928,7 @@ function _handlePartyWsMessage(msg){
         const respawnZoneId=msg.respawnZone||STATE.player.respawnZone||"safe_duskwatch";
         const respawnZone=ZONES.find(z=>z.id===respawnZoneId)||ZONES[0];
         STATE.zone=respawnZone;
+        _updateZoneMusic(respawnZone.name, respawnZone.id);
         STATE.tab="world";
         STATE._hasFled=false;
         updatePlayer(pp=>({...pp,hp:1,energy:0,cooldowns:{},isAlive:true}));
@@ -13943,6 +13946,7 @@ function _handlePartyWsMessage(msg){
         const respawnZoneId=msg.respawnZone||STATE.player.respawnZone||"safe_duskwatch";
         const respawnZone=ZONES.find(z=>z.id===respawnZoneId)||ZONES[0];
         STATE.zone=respawnZone;
+        _updateZoneMusic(respawnZone.name, respawnZone.id);
         STATE.tab="world";
         const hasFled=STATE._hasFled;
         STATE._hasFled=false;
@@ -13978,6 +13982,7 @@ function _handlePartyWsMessage(msg){
         const respawnZoneId=msg.respawnZone||STATE.player.respawnZone||"safe_duskwatch";
         const respawnZone=ZONES.find(z=>z.id===respawnZoneId)||ZONES[0];
         STATE.zone=respawnZone;
+        _updateZoneMusic(respawnZone.name, respawnZone.id);
         STATE.tab="world";
         STATE._hasFled=false;
         updatePlayer(pp=>({...pp,energy:0,cooldowns:{},isAlive:true}));
@@ -13999,6 +14004,7 @@ function _handlePartyWsMessage(msg){
         const fleeRespawnId=msg.respawnZone||STATE.player.respawnZone||"safe_duskwatch";
         const fleeRespawnZone=ZONES.find(z=>z.id===fleeRespawnId)||ZONES[0];
         STATE.zone=fleeRespawnZone;
+        _updateZoneMusic(fleeRespawnZone.name, fleeRespawnZone.id);
         STATE.tab="world";
         STATE.player={...STATE.player,lastZone:fleeRespawnZone.id};
         addLog("info","Party escaped from combat.");
@@ -14346,24 +14352,29 @@ function _showTravelOverlay(){
   if(_pc){_pc.innerHTML="";}
 }
 
-// Zone background music. Keyed by zone display name (matches the .name shown
-// on the travel screen). Add more zone:file pairs here as tracks are produced.
-const ZONE_MUSIC={
-  "Duskwatch":"music/Duskwatch.mp3",
-  "Goblin Forest":"music/GoblinForest.mp3"
-};
+// Accepts either a bare filename ("Duskwatch.mp3") as typed in the dev panel,
+// or an already-qualified path ("music/Duskwatch.mp3") for flexibility.
+function _resolveMusicSrc(val){
+  if(!val)return null;
+  val=String(val).trim();
+  if(!val)return null;
+  return val.indexOf("music/")===0?val:"music/"+val;
+}
 // Immediately stops whatever is currently playing (login theme or a previous
 // zone's track) and starts the track for the destination zone, if one exists.
-// Called at the top of showTravelScreen so it fires the instant a real travel
-// (not a dropped/duplicate call) is committed - covers manual travel, party
+// Reads the live zone's own `music` field, set via the Developer Panel's Zone
+// form — that's the single source of truth, no hardcoded zone list. Called at
+// the top of showTravelScreen so it fires the instant a real travel (not a
+// dropped/duplicate call) is committed - covers manual travel, party
 // follow/sync travel, and the post-login/character-creation zone load.
-function _updateZoneMusic(zoneName){
+function _updateZoneMusic(zoneName, zoneId){
   const loginBgm=el("login-bgm");
   if(loginBgm){loginBgm.pause();loginBgm.currentTime=0;}
   const bgm=el("zone-bgm");
   if(!bgm)return;
   bgm.pause();
-  const src=ZONE_MUSIC[zoneName];
+  const zoneObj=zoneId?ZONES.find(z=>z.id===zoneId):null;
+  const src=_resolveMusicSrc(zoneObj&&zoneObj.music);
   if(src){
     bgm.src=src;
     bgm.currentTime=0;
@@ -14375,13 +14386,13 @@ function _updateZoneMusic(zoneName){
   }
 }
 
-function showTravelScreen(zoneName, isSafe, onDone){
+function showTravelScreen(zoneName, isSafe, onDone, zoneId){
   // Layer 1: destination name lock.
   // Drop any call that isn't for the locked destination zone.
   if(_travelDestName!==null && zoneName!==_travelDestName){ return; }
   // Switch background music immediately - before any overlay animation - so it
   // starts/stops in lockstep with the black travel screen appearing.
-  _updateZoneMusic(zoneName);
+  _updateZoneMusic(zoneName, zoneId);
 
   // Layer 2: generation counter.
   // Increment the global generation. Every async callback spawned below captures
@@ -16388,7 +16399,7 @@ function renderMapTab(content){
           startCooldownTicker();
           renderWorldNav();
           updateChatBar();
-        });
+        }, z.id);
       },()=>{ _travelDestName=null; });
     };
     btn.onclick=doTravel;
@@ -16685,7 +16696,7 @@ function _applyPartyDoc(d){
           STATE.travelCooldown=60;
           startCooldownTicker();
           renderWorldNav();updateChatBar();
-        });
+        },newZ.id);
       },waitMs);
     }
   } else if(!_isPartyLeader()&&!STATE.inCombat&&!sig&&d.zone&&d.zone!==STATE.zone.id&&!STATE._followingPartyTravel&&_travelDestName===null){
@@ -16713,7 +16724,7 @@ function _applyPartyDoc(d){
         STATE.travelCooldown=60;
         startCooldownTicker();
         renderWorldNav();updateChatBar();
-      });
+      },newZ.id);
     }
   }
 
@@ -16796,7 +16807,7 @@ function _applyPartyDoc(d){
           STATE.travelCooldown=60;startCooldownTicker();
           STATE.tab="world";
           renderTitleBar();renderWorldNav();updateChatBar();
-        });
+        },newZ.id);
       }
     }
   }
@@ -19541,7 +19552,7 @@ async function doLogin(username){
       _travelDestName=STATE.zone.name;
       showTravelScreen(STATE.zone.name, STATE.zone.safe, ()=>{
         startGame();
-      });
+      }, STATE.zone.id);
   } else {
     // New account - connect WS early so char creation can go through server
     if(_myUid&&_authToken&&!_partyWs){
@@ -19668,7 +19679,7 @@ function _onCharCreateOk(){
     if(cb){cb.style.transition="";}
     if(cs){cs.style.opacity="";cs.style.pointerEvents="";cs.style.transition="";}
     startGame();
-  });
+  }, "safe_duskwatch");
 }
 
 // ========================================
