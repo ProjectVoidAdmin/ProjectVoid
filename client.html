@@ -1278,6 +1278,47 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 </style>
 </head>
 <body>
+<script>
+// ── Auto-fullscreen on entry ─────────────────────────────────────────────
+// Chrome/Android carries the "user activation" from the Enter button tap
+// on the landing page into this page load, so requesting fullscreen
+// immediately often succeeds with no extra tap needed. If the browser
+// blocks it (no carried-over activation, e.g. iOS Safari which doesn't
+// support this API at all, or a direct/bookmarked visit), a single
+// invisible full-page tap-catcher guarantees it fires on the very first
+// real tap instead, then gets out of the way permanently.
+(function(){
+  function requestFs(){
+    var el = document.documentElement;
+    var req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+    if(!req) return Promise.reject(new Error("unsupported"));
+    try{ return req.call(el) || Promise.resolve(); }catch(e){ return Promise.reject(e); }
+  }
+  function isFullscreen(){
+    return !!(document.fullscreenElement||document.webkitFullscreenElement||document.mozFullScreenElement||document.msFullscreenElement);
+  }
+  function armTapCatcher(){
+    if(isFullscreen())return;
+    var catcher=document.createElement("div");
+    catcher.id="_fsCatcher";
+    catcher.style.cssText="position:fixed;inset:0;z-index:999999;background:transparent;";
+    document.body.appendChild(catcher);
+    var done=false;
+    function onTap(){
+      if(done)return; done=true;
+      requestFs().catch(function(){});
+      catcher.remove();
+      document.removeEventListener("pointerdown",onTap,true);
+    }
+    document.addEventListener("pointerdown",onTap,true);
+  }
+  function init(){
+    requestFs().catch(function(){ armTapCatcher(); });
+  }
+  if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",init);}else{init();}
+})();
+</script>
+
 <div id="rotate-lock-overlay">
   <div class="rl-icon">⟳</div>
   <div class="rl-text">ROTATE YOUR DEVICE<br/>BACK TO PORTRAIT</div>
