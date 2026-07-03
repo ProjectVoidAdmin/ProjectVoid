@@ -161,6 +161,8 @@
     border-radius: 2px;
     text-decoration:none;
     cursor:pointer;
+    appearance: none;
+    -webkit-appearance: none;
     box-shadow: 0 0 25px rgba(124,58,237,0.45), 0 0 55px rgba(45,212,191,0.15);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     animation: shimmer 5s linear infinite;
@@ -188,6 +190,47 @@
   .enter-btn.disabled::after{
     border-top-color: #9ca3af;
     border-right-color: #9ca3af;
+  }
+
+  /* --- embedded game overlay (itch.io-style) --- */
+  .game-overlay{
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    background: #000;
+    display: none;
+  }
+
+  .game-overlay.active{
+    display: block;
+  }
+
+  #game-frame{
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+    background: #000;
+  }
+
+  .game-close{
+    position: absolute;
+    top: max(12px, env(safe-area-inset-top));
+    right: max(12px, env(safe-area-inset-right));
+    z-index: 100001;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.25);
+    background: rgba(5,5,10,0.65);
+    color: var(--text-main);
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
   }
 
   .enter-btn::after{
@@ -261,11 +304,16 @@
     </div>
 
     <div class="btn-wrap">
-      <a class="enter-btn disabled" id="enter-btn" href="client.html" rel="noopener" aria-disabled="true">
+      <button class="enter-btn disabled" id="enter-btn" aria-disabled="true" type="button">
         Enter
-      </a>
+      </button>
     </div>
   </main>
+
+  <div class="game-overlay" id="game-overlay">
+    <button class="game-close" id="game-close" aria-label="Close and return to menu" type="button">&times;</button>
+    <iframe id="game-frame" title="Project Void" allow="fullscreen"></iframe>
+  </div>
 
   <script>
     (function(){
@@ -273,23 +321,49 @@
       const enterBtn = document.getElementById('enter-btn');
       const WS_URL = 'wss://project-void-functions.fly.dev';
 
+      const overlay = document.getElementById('game-overlay');
+      const frame = document.getElementById('game-frame');
+      const closeBtn = document.getElementById('game-close');
+      const CLIENT_URL = 'client.html';
+
+      function launchGame(){
+        frame.src = CLIENT_URL;
+        overlay.classList.add('active');
+        if(overlay.requestFullscreen){
+          overlay.requestFullscreen().catch(() => {});
+        } else if(overlay.webkitRequestFullscreen){
+          try{ overlay.webkitRequestFullscreen(); }catch(err){}
+        }
+      }
+
+      function closeGame(){
+        const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+        if(fsEl){
+          const exit = document.exitFullscreen || document.webkitExitFullscreen;
+          if(exit) try{ exit.call(document); }catch(e){}
+        }
+        overlay.classList.remove('active');
+        frame.src = 'about:blank';
+      }
+
       enterBtn.addEventListener('click', (e) => {
-        if(enterBtn.classList.contains('disabled')){
-          e.preventDefault();
-          return;
-        }
-        e.preventDefault();
-        const destination = enterBtn.href;
-        const goToClient = () => { window.location.href = destination; };
-        const docEl = document.documentElement;
-        if(docEl.requestFullscreen){
-          docEl.requestFullscreen().catch(() => {}).finally(goToClient);
-        } else if(docEl.webkitRequestFullscreen){
-          try{ docEl.webkitRequestFullscreen(); }catch(err){}
-          goToClient();
-        } else {
-          goToClient();
-        }
+        if(enterBtn.classList.contains('disabled')) return;
+        launchGame();
+      });
+
+      closeBtn.addEventListener('click', closeGame);
+
+      // If the user exits fullscreen (Esc, back gesture, etc.) while the
+      // game is open, close the overlay and return to the landing page
+      // rather than leaving a non-fullscreen game window stranded.
+      ['fullscreenchange','webkitfullscreenchange'].forEach((evt) => {
+        document.addEventListener(evt, () => {
+          const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+          if(!fsEl && overlay.classList.contains('active')){
+            overlay.classList.remove('active');
+            frame.src = 'about:blank';
+          }
+        });
       });
 
       function setOnline(){

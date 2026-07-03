@@ -1313,6 +1313,7 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
     document.addEventListener("pointerdown",onTap,true);
   }
   function init(){
+    if(window.top!==window.self){ return; } // embedded in an iframe — parent page handles fullscreen
     requestFs().catch(function(){ armTapCatcher(); });
   }
   if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",init);}else{init();}
