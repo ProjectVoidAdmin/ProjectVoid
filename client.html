@@ -17424,8 +17424,12 @@ function renderPartySection(){
         const kickBtn=isLeader?`<button class="link-btn" style="color:#662222;font-size:10px;" data-party-kick="${escHtml(m.username)}">Kick</button>`:"";
         // Get HP from combat HP cache, profile cache, or server profile
         let mHp=0,mMaxHp=100,foundHp=false;
-        // 1. Combat HP by uid (during combat)
-        if(STATE._combatMemberHp){
+        // 1. Combat HP by uid (during combat only - this cache holds a stale
+        // snapshot from the last fight once combat ends, so outside combat
+        // (e.g. back in a safe zone after healing) it must be skipped in
+        // favor of the profile cache / server value below. renderPartySlots()
+        // already guards this the same way; this block was missing it.
+        if(STATE._combatMemberHp&&STATE.inCombat){
           let chp=STATE._combatMemberHp[m.uid]||null;
           // Try reverse lookup through combatUidMap
           if(!chp&&STATE._combatUidMap){
