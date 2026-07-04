@@ -42,21 +42,21 @@ input{font-family:'Courier New',monospace;}
 #login-screen{align-items:center;justify-content:center;background:#000;background-size:cover;background-position:center;background-repeat:no-repeat;overflow:hidden;position:relative;}
 .login-box{width:100%;max-width:360px;position:relative;z-index:2;transition:none;margin-top:-8vh;}
 #li-scanline,#ci-scanline{display:none;}
-#li-title{font-size:32px;font-weight:bold;letter-spacing:8px;color:#fff;font-family:'Courier New',monospace;text-align:center;opacity:0;animation:ci-flicker 1.4s ease 0.3s forwards,ci-glow 4s ease 1.8s infinite,ci-glitch 9s ease 2.5s infinite;line-height:1.15;}
-#li-sub{font-size:9px;letter-spacing:5px;color:#444;font-family:'Courier New',monospace;text-align:center;opacity:0;animation:ci-fadein 0.8s ease 1.8s forwards,ci-glitch2 11s ease 4s infinite;margin-top:4px;margin-bottom:0;}
+#li-title{font-size:32px;font-weight:bold;letter-spacing:8px;color:#fff;font-family:'Courier New',monospace;text-align:center;opacity:0;animation:ci-flicker 1.4s ease 0.3s forwards,ci-glow 4s ease 1.8s infinite,ci-glitch 9s ease 2.5s infinite;line-height:1.15;text-shadow:0 2px 6px rgba(0,0,0,0.85),0 0 18px rgba(0,0,0,0.6);}
+#li-sub{font-size:9px;letter-spacing:5px;color:#444;font-family:'Courier New',monospace;text-align:center;opacity:0;animation:ci-fadein 0.8s ease 1.8s forwards,ci-glitch2 11s ease 4s infinite;margin-top:4px;margin-bottom:0;text-shadow:0 2px 6px rgba(0,0,0,0.85);}
 #li-divider{height:1px;margin:8px 0 10px;position:relative;}
 #li-divider::after{content:'';position:absolute;top:0;left:0;height:1px;width:100%;background:linear-gradient(to right,transparent,#555,transparent);animation:ci-divider-fade 1.4s ease 2.2s forwards;opacity:0;transform:scaleX(0);transform-origin:center;}
 #li-form{opacity:0;animation:ci-form-in 0.8s ease 2.8s forwards;}
 /* Freeze login animations until devlog is dismissed */
 .li-paused #li-title,.li-paused #li-sub,.li-paused #li-form{animation-play-state:paused!important;opacity:0!important;}
 .li-paused #li-divider::after{animation-play-state:paused!important;opacity:0!important;transform:scaleX(0)!important;}
-.field-label{font-size:10px;color:#555;letter-spacing:2px;margin-bottom:5px;}
+.field-label{font-size:10px;color:#555;letter-spacing:2px;margin-bottom:5px;text-shadow:0 2px 5px rgba(0,0,0,0.85);}
 
 /* Fish behavior trait dropdown — no white on press */
 #dev-panel select{background:#010a12!important;color:#7aaccc!important;border-color:#222!important;outline:none!important;-webkit-tap-highlight-color:transparent!important;}
 #dev-panel select:focus,#dev-panel select:active,#dev-panel select:focus-visible{outline:none!important;box-shadow:none!important;background:#010a12!important;color:#7aaccc!important;border-color:#333!important;-webkit-tap-highlight-color:transparent!important;}
 /* Custom fake field - no real input, no Chrome toolbar ever */
-.vfield{width:100%;padding:10px 12px;background:#000;border:1px solid #333;border-radius:4px;color:#fff;font-size:13px;margin-bottom:12px;font-family:'Courier New',monospace;box-sizing:border-box;min-height:42px;cursor:text;display:block;-webkit-user-select:none;user-select:none;line-height:1.5;overflow:hidden;white-space:nowrap;-webkit-tap-highlight-color:transparent;}
+.vfield{width:100%;padding:10px 12px;background:rgba(0,0,0,0.55);border:1px solid #333;border-radius:4px;color:#fff;font-size:13px;margin-bottom:12px;font-family:'Courier New',monospace;box-sizing:border-box;min-height:42px;cursor:text;display:block;-webkit-user-select:none;user-select:none;line-height:1.5;overflow:hidden;white-space:nowrap;-webkit-tap-highlight-color:transparent;}
 .vfield.active{border-color:#888;}
 .dev-vfield.active,.dev-effect-vfield.active{border-color:#004d88!important;background:#020a12!important;color:#bbb!important;-webkit-text-fill-color:#bbb!important;}
 
@@ -79,7 +79,7 @@ input{font-family:'Courier New',monospace;}
 .vkb-key.pressed{background:#666;border-color:#888;transform:scale(0.93);}
 .vkb-shift-active{color:#ffcc00!important;border-color:#ffcc00!important;}
 /* vkb-open class set by JS - transform applied directly via JS for precision */
-.btn-primary{width:100%;padding:12px;background:#0a0a0a;border:1px solid #555;border-radius:4px;color:#aaa;font-size:12px;font-weight:bold;letter-spacing:3px;margin-bottom:10px;-webkit-tap-highlight-color:transparent;font-family:'Courier New',monospace;transition:transform 0.08s ease,border-color 0.08s ease,color 0.08s ease;}
+.btn-primary{width:100%;padding:12px;background:rgba(10,10,10,0.55);border:1px solid #555;border-radius:4px;color:#aaa;font-size:12px;font-weight:bold;letter-spacing:3px;margin-bottom:10px;-webkit-tap-highlight-color:transparent;font-family:'Courier New',monospace;transition:transform 0.08s ease,border-color 0.08s ease,color 0.08s ease;}
 @keyframes btn-press{0%{transform:scale(1);}40%{transform:scale(0.96);}100%{transform:scale(1);}}
 .btn-primary.pressed{animation:btn-press 0.22s ease forwards;border-color:#aaa;color:#fff;}
 .btn-secondary{width:100%;padding:10px;background:#000;border:1px solid #222;border-radius:4px;color:#444;font-size:11px;letter-spacing:1px;margin-bottom:8px;-webkit-tap-highlight-color:transparent;font-family:'Courier New',monospace;transition:transform 0.08s ease,border-color 0.08s ease,color 0.08s ease;}
