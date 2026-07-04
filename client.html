@@ -14686,6 +14686,24 @@ function _resumeInterruptedMedia(){
   // specific moment - intentionally not resumed if interrupted, same as any
   // sound effect that got cut off mid-play.
 }
+// ========================================
+//  PAUSE MUSIC WHEN BACKGROUNDED
+// ========================================
+// Android Chrome shows a persistent "now playing" notification for any tab
+// with actively-playing audio. Since we deliberately want BGM to pause while
+// the game is backgrounded (screen off, app switched away, etc.), pause it
+// here — currentTime/src are left untouched so _resumeInterruptedMedia()
+// can pick the track back up seamlessly when the app becomes active again.
+function _pauseMusicForBackground(){
+  const _bgm=el("login-bgm");
+  if(_bgm&&!_bgm.paused)_bgm.pause();
+  const _bgVid=el("login-bg-video");
+  if(_bgVid&&!_bgVid.paused)_bgVid.pause();
+  const bgm=el("zone-bgm");
+  if(bgm&&!bgm.paused)bgm.pause();
+}
+document.addEventListener("visibilitychange",()=>{ if(document.hidden)_pauseMusicForBackground(); });
+
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden)_resumeInterruptedMedia(); });
 window.addEventListener("focus",_resumeInterruptedMedia);
 window.addEventListener("pageshow",_resumeInterruptedMedia);
