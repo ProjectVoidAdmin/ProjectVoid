@@ -12852,6 +12852,18 @@ function _handlePartyWsMessage(msg){
           STATE.zone=merged;
           const _zh=document.getElementById("zone-label");
           if(_zh)_zh.textContent=(z.name||z.id).toUpperCase();
+          // Catch-up fix (same as the live_zones handler): if this zone's data
+          // (including its music field) arrived via a dev-panel approval broadcast
+          // WHILE the player was still landing here - e.g. a brand-new character
+          // whose travel screen silenced zone-bgm before this delta arrived - the
+          // zone-bgm element would otherwise be left silent with no src at all,
+          // since catalog_delta only patched STATE.zone/ZONES in memory and was
+          // missing this restart. Start it now instead of leaving it silent
+          // until the next zone change.
+          const _zbgm=document.getElementById("zone-bgm");
+          if(_zbgm&&!_zbgm.src&&!STATE.inCombat&&!STATE._activityMusicActive){
+            _updateZoneMusic(merged.name, merged.id);
+          }
         }
       });
       zonesDirty=true;
