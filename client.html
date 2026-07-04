@@ -4668,6 +4668,13 @@ function confirmLogout(){
 
   const yesBtn = _makeBtn('Yes', '#888', function() {
     _removeLgOv();
+    // Stop all music/video immediately — don't rely on the navigation below to
+    // kill it, since the 250ms fade-out (and navigation itself, on a slow
+    // connection) would otherwise leave zone/boss/login music audibly playing.
+    if(typeof _silenceAllMusic==='function') _silenceAllMusic();
+    if(typeof STATE!=='undefined'){ STATE._activityMusicActive=false; STATE._pendingActivityTrack=undefined; }
+    const _lgLbv=document.getElementById('login-bg-video');
+    if(_lgLbv){ _lgLbv.pause(); }
     // Close WS immediately
     if(typeof _partyWs !== 'undefined' && _partyWs) {
       try { _partyWs._intentionalClose = true; _partyWs.close(); } catch(e) {}
@@ -12722,6 +12729,15 @@ function _handlePartyWsMessage(msg){
           STATE.zone=merged;
           const _zh=document.getElementById("zone-label");
           if(_zh)_zh.textContent=(z.name||z.id).toUpperCase();
+          // Catch-up fix: if this zone's data (including its music field) arrived
+          // AFTER the player already entered it - e.g. a brand-new character
+          // landing before the first get_live_zones round trip finished - the
+          // zone-bgm element would have been left silent with no src at all.
+          // Start it now instead of leaving it silent until the next zone change.
+          const _zbgm=document.getElementById("zone-bgm");
+          if(_zbgm&&!_zbgm.src&&!STATE.inCombat&&!STATE._activityMusicActive){
+            _updateZoneMusic(merged.name, merged.id);
+          }
         }
       });
       // Save full zone list to localStorage cache (atomic: data + version together)
@@ -19964,6 +19980,13 @@ function _onCharCreateOk(){
   const name=STATE._pendingCharCreate?.name;
   STATE._pendingCharCreate=null;
   if(!name)return;
+  // STATE.zone was never being set here (unlike doLogin's existing-account path),
+  // which left it undefined for every brand-new character — breaking anything
+  // that reads STATE.zone, including renderWorldNav's market/arena buttons. The
+  // hardcoded object is a last-resort fallback only for the rare case ZONES
+  // hasn't loaded yet at all; the live_zones handler will replace it with the
+  // real (music-included) zone data the moment it arrives either way.
+  STATE.zone=ZONES.find(z=>z.id==="safe_duskwatch")||ZONES[0]||{id:"safe_duskwatch",name:"Duskwatch",safe:true,enemies:[],subzones:[],market:null,rarity:"common",description:"",music:""};
   // Register character name in public index and accounts object
   _registerCharName(name.toLowerCase(), STATE.username, _myUid);
   const _accs2=DB.getAccountsCache();
