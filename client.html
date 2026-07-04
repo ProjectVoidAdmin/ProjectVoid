@@ -21161,7 +21161,7 @@ document.addEventListener("selectionchange",()=>{
     var ph=getPlaceholder(f);
     var cursor=isActive?'<span class="vfield-cursor"></span>':'';
     if(val.length===0){
-      f.innerHTML=isActive?cursor:'<span class="vfield-placeholder">'+ph+'</span>';
+      f.innerHTML=isActive?(cursor+'<span class="vfield-placeholder">'+ph+'</span>'):'<span class="vfield-placeholder">'+ph+'</span>';
     } else {
       var _disp=display;if(f.id==='login-uname'&&_disp){_disp=_disp.charAt(0).toUpperCase()+_disp.slice(1).toLowerCase();}var _safeDisp=_disp.replace(/ /g,'\u00a0');f.innerHTML='<span class="vfield-text">'+_safeDisp+'</span>'+cursor;
     }
