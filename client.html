@@ -14819,6 +14819,21 @@ const _EVENT_MUSIC={victory:"Victory.mp3",death:"Death.mp3",flee:"Flee.mp3",bers
 // music, so it can layer over whatever the overlay screen is doing. Call
 // _stopEventMusic() (or _updateZoneMusic/_silenceAllMusic, which call it for you)
 // once the outcome screen ends.
+// Starts a BGM track's playback only if the app is actually in the
+// foreground right now. Without this guard, something like a death/respawn
+// that happens to resolve while the player has tabbed away (server pushes the
+// respawn zone change regardless of visibility) would call .play() on the new
+// zone's track immediately - starting audio out of nowhere while the game is
+// backgrounded, exactly the kind of surprise _pauseMusicForBackground exists
+// to prevent for already-playing tracks. src/currentTime are still set as
+// normal either way, so the track is fully ready to go the instant the app
+// comes back to the foreground - _resumeInterruptedMedia (wired to
+// visibilitychange/focus/pageshow) picks it up and starts it then.
+function _pvPlayIfVisible(track){
+  if(!track||document.hidden)return;
+  const _p=track.play();
+  if(_p&&_p.catch)_p.catch(()=>{});
+}
 function _playEventMusic(key){
   const file=_EVENT_MUSIC[key];
   const src=_resolveMusicSrc(file);
@@ -14828,8 +14843,7 @@ function _playEventMusic(key){
   if(src){
     ev.src=src;
     ev.currentTime=0;
-    const _p=ev.play();
-    if(_p&&_p.catch)_p.catch(()=>{});
+    _pvPlayIfVisible(ev);
   } else {
     ev.removeAttribute("src");
   }
@@ -14850,8 +14864,7 @@ function _updateZoneMusic(zoneName, zoneId){
   if(src){
     bgm.src=src;
     bgm.currentTime=0;
-    const _p=bgm.play();
-    if(_p&&_p.catch)_p.catch(()=>{});
+    _pvPlayIfVisible(bgm);
   } else {
     bgm.removeAttribute("src");
     bgm.currentTime=0;
@@ -14872,8 +14885,7 @@ function _playActivityMusic(rawTrack){
   bgm.pause();
   bgm.src=src;
   bgm.currentTime=0;
-  const _p=bgm.play();
-  if(_p&&_p.catch)_p.catch(()=>{});
+  _pvPlayIfVisible(bgm);
   return true;
 }
 // Call when an activity (Explore/subzone/Arena/Fishing) ends and the player
