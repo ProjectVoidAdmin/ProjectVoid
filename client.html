@@ -130,6 +130,12 @@ input{font-family:'Courier New',monospace;}
 #chat-input::-webkit-credentials-auto-fill-button,
 #chat-input::-webkit-strong-password-auto-fill-button{display:none!important;visibility:hidden!important;pointer-events:none!important;position:absolute!important;right:0;}
 #chat-send{background:#000;border:1px solid #333;border-radius:3px;color:#aaa;font-size:11px;padding:5px 8px;}
+/* Log-only tabs (combat/system/loot): dim the border/text to show disabled state,
+   but keep the background fully opaque #000 — unlike opacity, which faded the whole
+   box (including its background) and let the zone art behind it show through. */
+#chat-input.log-only-disabled{border-color:#222!important;}
+#chat-input.log-only-disabled .vfield-placeholder{color:#3a3a3a!important;}
+#chat-send.log-only-disabled{color:#3a3a3a!important;border-color:#222!important;}
 /* Combat UI block: wraps status-block/player-bars/action-grid. min-height matches
    #world-nav's height exactly so #log-area (flex:1) — and therefore #chat-bar, which
    sits directly below it — occupies the same space whether in or out of combat. */
@@ -4072,12 +4078,12 @@ function switchLogTab(tab){
   const chatInput=el("chat-input");
   const chatSendBtn=el("chat-send");
   if(tab==="combat"||tab==="system"||tab==="loot"){
-    if(chatInput){chatInput.style.opacity="0.3";chatInput.style.pointerEvents="none";}
-    if(chatSendBtn){chatSendBtn.style.opacity="0.3";chatSendBtn.style.pointerEvents="none";}
+    if(chatInput){chatInput.classList.add("log-only-disabled");chatInput.style.pointerEvents="none";}
+    if(chatSendBtn){chatSendBtn.classList.add("log-only-disabled");chatSendBtn.style.pointerEvents="none";}
     if(chatInput){chatInput.dataset.placeholder=tab==="combat"?"Combat log only...":tab==="loot"?"Loot log only...":"System log only...";if(window._vkbRender)window._vkbRender(chatInput);}
   } else {
-    if(chatInput){chatInput.style.opacity="";chatInput.style.pointerEvents="";}
-    if(chatSendBtn){chatSendBtn.style.opacity="";chatSendBtn.style.pointerEvents="";}
+    if(chatInput){chatInput.classList.remove("log-only-disabled");chatInput.style.pointerEvents="";}
+    if(chatSendBtn){chatSendBtn.classList.remove("log-only-disabled");chatSendBtn.style.pointerEvents="";}
     if(tab==="guild"){
       if(chatInput){chatInput.dataset.placeholder="Guild chat...";if(window._vkbRender)window._vkbRender(chatInput);}
     } else if(tab==="party"){
@@ -21408,6 +21414,10 @@ window.addEventListener("pageshow",function(e){
 // ── visibilitychange: snap reconnect screen immediately when tab comes back ───
 document.addEventListener("visibilitychange",function(){
   if(document.visibilityState==="visible"){
+    // Re-enter fullscreen right away on tab-back. Browsers may reject this since it's
+    // not a user gesture, so the existing tap/click/key listeners (_forceFullscreen)
+    // remain as the guaranteed fallback if this attempt is silently blocked.
+    if(window._forceFullscreen)window._forceFullscreen();
     // If WS is down and 2s threshold has passed, show reconnect screen now
     if((!_partyWs||_partyWs.readyState!==1)&&STATE&&STATE.player&&STATE.player.name){
       if(window._rcDelayTimer){
