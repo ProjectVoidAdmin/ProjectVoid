@@ -2266,10 +2266,13 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
     else if(el.webkitRequestFullscreen)el.webkitRequestFullscreen();
   }
   window._forceFullscreen=_forceFullscreen;
-  // Any tap/click/key re-enters fullscreen if it's not already active
-  document.addEventListener("touchstart",_forceFullscreen,{passive:true});
+  // Any tap/click/key re-enters fullscreen if it's not already active.
+  // Deliberately NOT listening on pointerdown/touchstart here: Android doesn't always
+  // treat pointerdown as valid user-activation for the Fullscreen API, and a rejected/
+  // stalled request from it can freeze the visual frame until a second tap forces a
+  // repaint - i.e. exactly the "extra throwaway tap" problem. click fires as part of
+  // the same physical tap and is the reliable activation source, so it alone is used.
   document.addEventListener("click",_forceFullscreen);
-  document.addEventListener("pointerdown",_forceFullscreen,{passive:true});
   document.addEventListener("keydown",_forceFullscreen);
   document.addEventListener("fullscreenchange",function(){
     if(document.fullscreenElement)_lockPortrait();
