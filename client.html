@@ -2295,12 +2295,21 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   // Tapping anywhere (including the overlay) re-enters fullscreen on pointerdown,
   // so it happens the instant a finger touches the glass rather than waiting for
   // the click that follows it.
+  // IMPORTANT: only ONE requestFullscreen() call may happen per physical tap. Calling
+  // it again from the click that follows the same tap can consume/reject the gesture's
+  // activation and force an actual second tap to recover - which is the exact bug this
+  // guards against. So click only acts as a fallback when pointerdown didn't already try.
+  var _fsLastAttempt=0;
   document.addEventListener("pointerdown",function(){
-    if(!_isFsActive())_forceFullscreen();
+    if(!_isFsActive()){
+      _fsLastAttempt=Date.now();
+      _forceFullscreen();
+    }
   },true);
-  // click/keydown remain as a fallback for input types that don't fire pointerdown
-  // (e.g. keyboard) or environments where pointerdown activation is rejected.
-  document.addEventListener("click",_forceFullscreen);
+  document.addEventListener("click",function(){
+    if(Date.now()-_fsLastAttempt<800)return; // already handled by pointerdown for this tap
+    _forceFullscreen();
+  });
   document.addEventListener("keydown",_forceFullscreen);
   document.addEventListener("fullscreenchange",function(){
     if(document.fullscreenElement)_lockPortrait();
