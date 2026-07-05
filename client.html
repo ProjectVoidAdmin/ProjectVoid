@@ -1301,6 +1301,7 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 </style>
 </head>
 <body>
+<div id="_topNotchGuard" style="display:none;position:fixed;top:0;left:0;right:0;height:max(env(safe-area-inset-top,0px),28px);background:#000;z-index:1000000;pointer-events:none;"></div>
 <script>
 // ── Auto-fullscreen on entry ─────────────────────────────────────────────
 // Chrome/Android carries the "user activation" from the Enter button tap
@@ -4308,6 +4309,12 @@ function showScreen(id){
   if(!_screens)_screens=Array.from(document.querySelectorAll(".screen"));
   _screens.forEach(s=>s.classList.remove("active"));
   el(id).classList.add("active");
+  // Notch/status-bar guard strip: only shown once past the launch (login/create) flow,
+  // so the login and account-creation screens keep their original full-bleed art at the top.
+  const _notchGuard=document.getElementById("_topNotchGuard");
+  if(_notchGuard){
+    _notchGuard.style.display=(id==="login-screen"||id==="create-screen")?"none":"block";
+  }
   // Login screen background music: play while login-screen is active, stop otherwise.
   const _bgm=_pvBgm("login-bgm");
   if(_bgm){
