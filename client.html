@@ -15088,7 +15088,7 @@ document.addEventListener("visibilitychange",()=>{ if(!document.hidden)_resumeIn
 window.addEventListener("focus",_resumeInterruptedMedia);
 window.addEventListener("pageshow",_resumeInterruptedMedia);
 
-function showTravelScreen(zoneName, isSafe, onDone, zoneId){
+function showTravelScreen(zoneName, isSafe, onDone, zoneId, onBgReady){
   // Wrap onDone so every zone-change path (leader travel, party-follow,
   // passive zone-follow, zone-sync-on-join) scrolls chat to bottom on arrival.
   const _origTravelOnDone=onDone;
@@ -15121,7 +15121,7 @@ function showTravelScreen(zoneName, isSafe, onDone, zoneId){
   const particleEl = document.getElementById("tr-particles");
   const barWrap    = document.getElementById("tr-bar-wrap");
   const barFill    = document.getElementById("tr-bar-fill");
-  if(!overlay){ _updateZoneMusic(zoneName, zoneId); _updateZoneBackground(zoneId); onDone(); return; }
+  if(!overlay){ _updateZoneMusic(zoneName, zoneId); _updateZoneBackground(zoneId); if(onBgReady)onBgReady(); onDone(); return; }
   const accentColor = isSafe ? "#44ee44" : "#ff4444";
   const glowAnim    = isSafe ? "tr-glow-safe" : "tr-glow-danger";
   const typeLabel   = isSafe ? "SAFE ZONE" : "DANGER ZONE";
@@ -15210,6 +15210,12 @@ function showTravelScreen(zoneName, isSafe, onDone, zoneId){
       // never leave the transition stuck on screen indefinitely.
       Promise.resolve(_bgReadyPromise).then(()=>{
         if(gen !== _travelCallGen) return;
+        // The destination is now fully in place (background loaded, and for
+        // login/char-creation the world UI itself — see onBgReady callers) but
+        // still hidden underneath the overlay. Let the caller populate/reveal
+        // anything it wants settled before the overlay becomes visible at all,
+        // so nothing pops in partway through (or after) the fade.
+        if(onBgReady)onBgReady();
         if(_trParticleTimer){ clearInterval(_trParticleTimer); _trParticleTimer=null; }
         overlay.style.transition="opacity 0.5s ease";
         overlay.style.opacity="0";
@@ -20204,6 +20210,9 @@ document.addEventListener("pointerdown",function(e){
   }
 },{capture:true,passive:false});
 async function doLogin(username){
+  // Fresh login: allow _renderFreshWorldUI() to run again for this session
+  // (it's guarded to only fire once per set of the flag).
+  _freshWorldUiRendered=false;
   // Clear any queued messages from previous session before starting fresh
   if(typeof _wsSendQueue!=="undefined") _wsSendQueue.length=0;
   // ── Flush all transient runtime state so data never bleeds between accounts ──
@@ -20332,7 +20341,7 @@ async function doLogin(username){
       _travelDestName=STATE.zone.name;
       showTravelScreen(STATE.zone.name, STATE.zone.safe, ()=>{
         startGame();
-      }, STATE.zone.id);
+      }, STATE.zone.id, _renderFreshWorldUI);
   } else {
     // New account - connect WS early so char creation can go through server
     if(_myUid&&_authToken&&!_partyWs){
@@ -20434,6 +20443,8 @@ function doCreateChar(){
 
 // Called when server confirms character creation
 function _onCharCreateOk(){
+  // Fresh session: allow _renderFreshWorldUI() to run again.
+  _freshWorldUiRendered=false;
   const name=STATE._pendingCharCreate?.name;
   STATE._pendingCharCreate=null;
   if(!name)return;
@@ -20466,12 +20477,48 @@ function _onCharCreateOk(){
     if(cb){cb.style.transition="";}
     if(cs){cs.style.opacity="";cs.style.pointerEvents="";cs.style.transition="";}
     startGame();
-  }, "safe_duskwatch");
+  }, "safe_duskwatch", _renderFreshWorldUI);
 }
 
 // ========================================
 //  START GAME
 // ========================================
+// Renders the initial world UI (world-nav, title bar, chat bar, log tabs)
+// fresh for a brand-new game session. Pulled out of startGame() so it can
+// also be invoked earlier, via showTravelScreen's onBgReady hook, at the
+// exact moment the destination background is confirmed loaded but the
+// travel overlay hasn't started fading yet. Previously this only ran inside
+// startGame() (onDone, i.e. AFTER the overlay's 0.5s fade fully completed),
+// which meant on first login you'd see the destination background revealed
+// through the dimming overlay with no game UI at all underneath it yet,
+// then have the UI abruptly snap into view once the fade finished. Now it's
+// already sitting in place, fully rendered, before the overlay even starts
+// to fade — background and UI reveal together instead of UI trailing behind.
+// Idempotent (guarded by _freshWorldUiRendered) since both the early
+// onBgReady call and this normal startGame() call may otherwise both fire;
+// re-running this would wipe out any chat/log lines that arrived in between.
+let _freshWorldUiRendered=false;
+function _renderFreshWorldUI(){
+  if(_freshWorldUiRendered)return;
+  _freshWorldUiRendered=true;
+  // Clear both logs so no stale messages from previous sessions
+  // Reset log tab to chat on every fresh game start so the tab highlight is correct
+  // Reset title bar cache so all fields re-render fresh
+  _tbCache={gold:-1,hp:-1,maxHp:-1,zone:"",title:"",name:"",notifN:-1};_lastRenderedTab=null;
+  activeLogTab="chat";
+  _applyLogTabColors();
+  const lc=el("log-chat");const lb=el("log-combat");const lg=el("log-guild");const lp=el("log-party");const ls=el("log-system");const ldm=el("log-dm");const lo=el("log-loot");
+  if(lc)lc.innerHTML="";if(lb)lb.innerHTML="";if(lg)lg.innerHTML="";if(lp)lp.innerHTML="";if(ls)ls.innerHTML="";if(ldm)ldm.innerHTML="";if(lo)lo.innerHTML="";
+  el("status-block").style.display="none";
+  el("action-grid").style.display="none";
+  el("player-bars").style.display="none";
+  // Block pointer events briefly so no bleed-through taps from previous screen trigger world buttons
+  const wn=el("world-nav");
+  if(wn){wn.style.pointerEvents="none";setTimeout(()=>{wn.style.pointerEvents="";},400);}
+  renderWorldNav();
+  if(typeof renderTitleBar==="function")renderTitleBar();
+  updateChatBar();
+}
 function startGame(){
   STATE._gameStarted=true;
   // Reset idle timeout on login so the 30min clock starts fresh
@@ -20615,25 +20662,7 @@ function startGame(){
     },true);
   }
   showScreen("game-screen");
-  // Clear both logs so no stale messages from previous sessions
-  // Reset log tab to chat on every fresh game start so the tab highlight is correct
-  // Reset title bar cache so all fields re-render fresh
-  _tbCache={gold:-1,hp:-1,maxHp:-1,zone:"",title:"",name:"",notifN:-1};_lastRenderedTab=null;
-  activeLogTab="chat";
-  _applyLogTabColors();
-  const lc=el("log-chat");const lb=el("log-combat");const lg=el("log-guild");const lp=el("log-party");const ls=el("log-system");const ldm=el("log-dm");const lo=el("log-loot");
-  if(lc)lc.innerHTML="";if(lb)lb.innerHTML="";if(lg)lg.innerHTML="";if(lp)lp.innerHTML="";if(ls)ls.innerHTML="";if(ldm)ldm.innerHTML="";if(lo)lo.innerHTML="";
-
-  // One-time DM check on login to catch messages that arrived while offline
-  el("status-block").style.display="none";
-  el("action-grid").style.display="none";
-  el("player-bars").style.display="none";
-  // Block pointer events briefly so no bleed-through taps from previous screen trigger world buttons
-  const wn=el("world-nav");
-  if(wn){wn.style.pointerEvents="none";setTimeout(()=>{wn.style.pointerEvents="";},400);}
-  renderWorldNav();
-  if(typeof renderTitleBar==="function")renderTitleBar();
-  updateChatBar();
+  _renderFreshWorldUI();
   // Auto-heal if starting in a safe zone
   _safeZoneHeal();
   if(STATE.zone&&STATE.zone.id)
