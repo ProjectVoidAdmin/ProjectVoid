@@ -2303,6 +2303,7 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   document.addEventListener("pointerdown",function(){
     if(!_isFsActive()){
       _fsLastAttempt=Date.now();
+      try{if(!document.hasFocus())window.focus();}catch(e){}
       _forceFullscreen();
     }
   },true);
@@ -2327,7 +2328,17 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   _lockPortrait();
   _updateFsResumeOverlay();
   document.addEventListener("visibilitychange",function(){
-    if(document.visibilityState==="visible")_updateFsResumeOverlay();
+    if(document.visibilityState==="visible"){
+      _updateFsResumeOverlay();
+      // Some browsers (esp. Android Chrome) treat the very first tap after a tab/app
+      // switch as "just refocusing the window" and don't grant it real activation for
+      // the Fullscreen API - the tap is spent on refocus, not on the fullscreen request,
+      // which is exactly what forced the extra second tap. Pro-actively refocusing here
+      // (a script-triggered focus() doesn't need a gesture) means by the time the real
+      // tap lands, the window is already focused, so that tap's activation goes entirely
+      // toward the fullscreen request instead.
+      try{window.focus();}catch(e){}
+    }
   });
   // Safety net: some browsers exit fullscreen (e.g. via OS gesture) without firing
   // fullscreenchange reliably, so poll lightly to keep the overlay in sync.
