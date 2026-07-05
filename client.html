@@ -209,7 +209,7 @@ input{font-family:'Courier New',monospace;}
 .bag-equip-btn:active,.bag-equip-btn:focus,.bag-equip-btn:focus-visible{outline:none!important;background:none!important;-webkit-tap-highlight-color:transparent!important;}
 .sblock-body .srow button,.sblock-body .srow button *{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;-webkit-tap-highlight-color:transparent!important;}
 /* Popup overlay */
-.popup-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.92);z-index:200;align-items:flex-end;justify-content:center;touch-action:pan-y;}
+.popup-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#000;z-index:200;align-items:flex-end;justify-content:center;touch-action:pan-y;}
 .popup-overlay.show{display:flex;}
 .popup-box{background:#000;border:1px solid #444;border-radius:8px 8px 0 0;width:100%;max-width:430px;display:flex;flex-direction:column;height:calc(100dvh - 48px);max-height:calc(100dvh - 48px);touch-action:pan-y;}
 
@@ -243,7 +243,7 @@ input{font-family:'Courier New',monospace;}
 .popup-dropdown-hdr span{font-size:9px;letter-spacing:2px;color:#aaa;}
 .popup-dropdown-arrow{font-size:10px;color:#666;transition:transform 0.2s ease;}
 .popup-dropdown.open .popup-dropdown-arrow{transform:rotate(90deg);}
-.popup-dropdown-body{display:none;padding:4px 12px 4px;}
+.popup-dropdown-body{display:none;padding:4px 12px 4px;background:#000;}
 .popup-dropdown.open .popup-dropdown-body{display:block;}
 /* Char create */
 #create-screen{background:#000;overflow:hidden;}
@@ -2157,7 +2157,7 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 </div>
 
 <!-- Sub-popup layer (item detail, buy qty, action detail - shown over market/crafting) -->
-<div id="popup2" class="popup-overlay" style="z-index:210;background:rgba(0,0,0,0.75);">
+<div id="popup2" class="popup-overlay" style="z-index:210;background:#000;">
   <div class="popup-box">
     <div class="popup-header" style="justify-content:space-between;">
       <div class="popup-title" id="popup2-title"></div>
