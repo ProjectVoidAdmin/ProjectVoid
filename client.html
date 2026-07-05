@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="display" content="fullscreen"/>
+<meta name="display" content="standalone"/>
 <link rel="manifest" href="manifest.json"/>
 <link rel="icon" href="icon-192.png"/>
 <link rel="apple-touch-icon" href="apple-touch-icon.png"/>
@@ -2275,20 +2275,26 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
     }catch(e){}
   }
   window._lockPortrait=_lockPortrait;
+  function _isInstalledDisplayMode(){
+    // An installed PWA can launch in either display mode depending on platform/manifest;
+    // both mean there's no browser chrome and no Fullscreen-API-driven state to check.
+    return window.matchMedia("(display-mode: standalone)").matches||window.matchMedia("(display-mode: fullscreen)").matches;
+  }
   function _isFsActive(){
-    return !!(document.fullscreenElement||document.webkitFullscreenElement)||window.matchMedia("(display-mode: standalone)").matches;
+    return !!(document.fullscreenElement||document.webkitFullscreenElement)||_isInstalledDisplayMode();
   }
   function _forceFullscreen(){
     var _dlOv=document.getElementById("devlog-overlay");
     if(_dlOv&&_dlOv.style.display!=="none")return false;
     if(document.fullscreenElement||document.webkitFullscreenElement){_lockPortrait();return false;}
-    if(window.matchMedia("(display-mode: standalone)").matches){_lockPortrait();return false;}
+    if(_isInstalledDisplayMode()){_lockPortrait();return false;}
     var el=document.documentElement;
     if(el.requestFullscreen){el.requestFullscreen({navigationUI:"hide"}).then(_lockPortrait).catch(function(){});return true;}
     else if(el.webkitRequestFullscreen){el.webkitRequestFullscreen();return true;}
     return false;
   }
   window._forceFullscreen=_forceFullscreen;
+
 
   // ── "Tap to continue" overlay: shown any time we're not in fullscreen ────
   // NOTE: this is a *resume* prompt (tab-back, bfcache exit, etc.), not part of the
