@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="theme-color" content="#000000"/>
 <meta name="color-scheme" content="dark"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-visual"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-visual, viewport-fit=cover"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
@@ -2276,18 +2276,20 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   }
   window._lockPortrait=_lockPortrait;
   function _isInstalledDisplayMode(){
-    // An installed PWA can launch in either display mode depending on platform/manifest;
-    // both mean there's no browser chrome and no Fullscreen-API-driven state to check.
+    // An installed PWA can launch in either display mode depending on platform/manifest.
+    // NOTE: this only tells us there's no browser chrome (address bar/tabs) - it does NOT
+    // mean the OS status bar / gesture-nav bar are hidden. Those are only hidden by the
+    // real Fullscreen API (document.fullscreenElement), which is independent of display
+    // mode and can be entered or exited at any time regardless of standalone status.
     return window.matchMedia("(display-mode: standalone)").matches||window.matchMedia("(display-mode: fullscreen)").matches;
   }
   function _isFsActive(){
-    return !!(document.fullscreenElement||document.webkitFullscreenElement)||_isInstalledDisplayMode();
+    return !!(document.fullscreenElement||document.webkitFullscreenElement);
   }
   function _forceFullscreen(){
     var _dlOv=document.getElementById("devlog-overlay");
     if(_dlOv&&_dlOv.style.display!=="none")return false;
     if(document.fullscreenElement||document.webkitFullscreenElement){_lockPortrait();return false;}
-    if(_isInstalledDisplayMode()){_lockPortrait();return false;}
     var el=document.documentElement;
     if(el.requestFullscreen){el.requestFullscreen({navigationUI:"hide"}).then(_lockPortrait).catch(function(){});return true;}
     else if(el.webkitRequestFullscreen){el.webkitRequestFullscreen();return true;}
@@ -21609,6 +21611,14 @@ document.addEventListener("selectionchange",()=>{
   const lockedH = getInitialHeight();
   applyHeight(lockedH);
 
+  // In standalone/fullscreen (installed PWA / Discord webview "app" mode) there is no
+  // real browser chrome to hide/show. Small viewport-height deltas there are just the
+  // transient system status/gesture-nav bar overlay flashing in and out (e.g. swipe-up),
+  // NOT a usable-area change - so we must NOT reflow #app for those, or the UI visibly
+  // shifts/pushes every time that overlay appears. Only a real orientation/keyboard change
+  // (large delta) should ever update the lock while standalone.
+  const isStandaloneMode = window.matchMedia("(display-mode: standalone)").matches||window.matchMedia("(display-mode: fullscreen)").matches;
+
   // Track keyboard state: if height drops significantly = keyboard opened, ignore it
   let baseH = lockedH;
   const KEYBOARD_THRESHOLD = 100; // px - changes smaller than this are chrome show/hide, not keyboard
@@ -21617,6 +21627,15 @@ document.addEventListener("selectionchange",()=>{
     window.visualViewport.addEventListener('resize', ()=>{
       const newH = window.visualViewport.height;
       const delta = newH - baseH;
+      if(isStandaloneMode){
+        // Standalone: ignore transient system-bar overlay deltas entirely (in either
+        // direction). Only react to a genuine large change (rotation/keyboard settling).
+        if(Math.abs(delta) > KEYBOARD_THRESHOLD){
+          baseH = newH;
+          applyHeight(newH);
+        }
+        return;
+      }
       if(delta > KEYBOARD_THRESHOLD){
         // Height grew a lot = keyboard closed or orientation change, update lock
         baseH = newH;
