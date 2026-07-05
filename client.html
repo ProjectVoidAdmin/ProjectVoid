@@ -12747,6 +12747,12 @@ function _handlePartyWsMessage(msg){
           description:z.description||"",
           zoneNumber:z.zoneNumber!=null?Number(z.zoneNumber):null,
           music:z.music||"",
+          background:z.background||"",
+          exploreMusic:z.exploreMusic||"",
+          arenaMusic1v1:z.arenaMusic1v1||"",
+          arenaMusic2v2:z.arenaMusic2v2||"",
+          arenaMusic4v4:z.arenaMusic4v4||"",
+          arenaBackground:z.arenaBackground||"",
           _live:true,
         };
         if(existing>=0)ZONES[existing]=merged;
