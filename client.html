@@ -9,8 +9,17 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="display" content="fullscreen"/>
-<link rel="manifest" href="data:application/json,{&quot;display&quot;:&quot;fullscreen&quot;,&quot;orientation&quot;:&quot;portrait&quot;,&quot;name&quot;:&quot;Project Void&quot;,&quot;short_name&quot;:&quot;PV&quot;,&quot;start_url&quot;:&quot;/&quot;,&quot;background_color&quot;:&quot;%23000000&quot;,&quot;theme_color&quot;:&quot;%23000000&quot;}"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="icon" href="icon-192.png"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
 <title>Project Void v2</title>
+<script>
+if("serviceWorker" in navigator){
+  window.addEventListener("load",function(){
+    navigator.serviceWorker.register("sw.js").catch(function(){});
+  });
+}
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{height:100svh;max-height:100svh;background:#000;font-family:'Courier New',monospace;color:#fff;overflow:hidden;overscroll-behavior:none;touch-action:none;}
