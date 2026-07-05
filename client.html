@@ -130,6 +130,10 @@ input{font-family:'Courier New',monospace;}
 #chat-input::-webkit-credentials-auto-fill-button,
 #chat-input::-webkit-strong-password-auto-fill-button{display:none!important;visibility:hidden!important;pointer-events:none!important;position:absolute!important;right:0;}
 #chat-send{background:#000;border:1px solid #333;border-radius:3px;color:#aaa;font-size:11px;padding:5px 8px;}
+/* Combat UI block: wraps status-block/player-bars/action-grid. min-height matches
+   #world-nav's height exactly so #log-area (flex:1) — and therefore #chat-bar, which
+   sits directly below it — occupies the same space whether in or out of combat. */
+#combat-ui-block{flex-shrink:1;display:none;flex-direction:column;min-height:min(269px,42vh);}
 /* Status block (combat) */
 #status-block{flex-shrink:1;padding:6px 14px 4px;display:none;min-height:0;}
 #enemy-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:6px;}
@@ -1795,6 +1799,12 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
     <button id="chat-send">Send</button>
   </div>
 
+  <!-- Combat UI block: wraps enemy grid, player bars, and action grid so their combined
+       height can be pinned to match world-nav's height (min(269px,42vh)). Without this,
+       the combat block's natural content height differs from world-nav's fixed height,
+       so #log-area (flex:1) ends up a different size in/out of combat, and #chat-bar
+       (which sits directly below #log-area) visibly shifts position between the two. -->
+  <div id="combat-ui-block" style="display:none;">
   <!-- Status (combat only - enemy grid) -->
   <div id="status-block">
     <div id="enemy-grid"></div>
@@ -1816,6 +1826,7 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   <div id="action-grid">
     <div id="action-buttons"></div>
   </div>
+  </div><!-- /combat-ui-block -->
 
   <!-- World nav -->
   <div id="world-nav">
@@ -12239,6 +12250,7 @@ async function startCombat(enemyList){
     pc.parentNode.replaceChild(fresh,pc);
     addTargetTap(fresh,()=>{STATE.targetUid="__self__";renderCombatUI();});
   }
+  el("combat-ui-block").style.display="flex";
   el("status-block").style.display="block";
   el("action-grid").style.display="block";
   el("player-bars").style.display="block";
@@ -12257,6 +12269,7 @@ async function startCombat(enemyList){
 // Called from server tick handler to keep border/text gold in sync
 // without waiting for a full renderCombatUI call.
 function endCombatUI(){
+  el("combat-ui-block").style.display="none";
   el("status-block").style.display="none";
   el("action-grid").style.display="none";
   el("player-bars").style.display="none";
@@ -13791,6 +13804,7 @@ function _handlePartyWsMessage(msg){
         STATE._energyLerpTimer=setInterval(()=>{if(STATE.inCombat)renderCombatUI();},100);
         STATE.stateRef={active:true,player:{...STATE.player},enemies:[]};
         // Show combat UI panels
+        el("combat-ui-block").style.display="flex";
         el("status-block").style.display="block";
         el("action-grid").style.display="block";
         el("player-bars").style.display="block";
@@ -13917,6 +13931,7 @@ function _handlePartyWsMessage(msg){
         STATE._energyLerpTimer=setInterval(()=>{if(STATE.inCombat)renderCombatUI();},100);
         STATE.stateRef={active:true,player:{...STATE.player},enemies:STATE.combatEnemies};
         addLog("combat_info","Rejoining combat!");
+        el("combat-ui-block").style.display="flex";
         el("status-block").style.display="block";
         el("action-grid").style.display="block";
         el("player-bars").style.display="block";
@@ -13929,6 +13944,7 @@ function _handlePartyWsMessage(msg){
       } else {
         // Mid-combat reconnect - ensure combat UI is visible
         if(STATE.inCombat){
+          el("combat-ui-block").style.display="flex";
           el("status-block").style.display="block";
           el("action-grid").style.display="block";
           el("player-bars").style.display="block";
@@ -14192,6 +14208,7 @@ function _handlePartyWsMessage(msg){
       renderCombatUI();
       // Safety: ensure combat UI stays visible during active combat
       if(STATE.inCombat&&el("status-block")&&el("status-block").style.display==="none"){
+        el("combat-ui-block").style.display="flex";
         el("status-block").style.display="block";
         el("action-grid").style.display="block";
         el("player-bars").style.display="block";
@@ -20516,6 +20533,7 @@ function _renderFreshWorldUI(){
   _applyLogTabColors();
   const lc=el("log-chat");const lb=el("log-combat");const lg=el("log-guild");const lp=el("log-party");const ls=el("log-system");const ldm=el("log-dm");const lo=el("log-loot");
   if(lc)lc.innerHTML="";if(lb)lb.innerHTML="";if(lg)lg.innerHTML="";if(lp)lp.innerHTML="";if(ls)ls.innerHTML="";if(ldm)ldm.innerHTML="";if(lo)lo.innerHTML="";
+  el("combat-ui-block").style.display="none";
   el("status-block").style.display="none";
   el("action-grid").style.display="none";
   el("player-bars").style.display="none";
