@@ -1,9 +1,9 @@
 {
   "name": "Project Void",
   "short_name": "Project Void",
-  "start_url": "./client.html",
+  "start_url": ".",
   "scope": "./",
-  "display": "standalone",
+  "display": "fullscreen",
   "orientation": "portrait",
   "background_color": "#000000",
   "theme_color": "#000000",
