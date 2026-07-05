@@ -1756,6 +1756,7 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 <!-- ════════════════════════════════ GAME ══════════════════════════════════════ -->
 <div id="game-screen" class="screen">
   <video id="zone-bg-video" muted loop playsinline autoplay disablepictureinpicture disableremoteplayback style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;"></video>
+  <div id="_bg_debug_hud" style="position:absolute;top:2px;left:2px;z-index:99999;background:rgba(0,0,0,0.75);color:#0f0;font-family:monospace;font-size:9px;line-height:1.4;padding:4px 6px;pointer-events:none;white-space:pre-wrap;max-width:95%;">bg-debug: (not yet run)</div>
   <div id="zone-bg-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,0);z-index:-1;pointer-events:none;"></div>
   <!-- Title bar -->
   <div id="title-bar">
@@ -14720,24 +14721,28 @@ function _applyGameBackground(rawVal){
   if(!gs)return;
   const vid=el("zone-bg-video");
   const src=_resolveBgSrc(rawVal);
+  const _hud=el("_bg_debug_hud");
   if(!src){
     gs.style.backgroundImage="";
     if(vid){vid.pause();vid.removeAttribute("src");vid.style.display="none";}
+    if(_hud)_hud.textContent="bg-debug: raw="+JSON.stringify(rawVal)+" -> NO SOURCE (field empty/undefined) | zone="+(STATE.zone&&STATE.zone.id);
     return;
   }
   if(_BG_VIDEO_EXT.test(src)){
     gs.style.backgroundImage="";
     if(vid){
       vid.disablePictureInPicture=true;
-      vid.onerror=()=>{vid.style.display="none";};
+      vid.onerror=()=>{vid.style.display="none";if(_hud)_hud.textContent+=" | VIDEO ERROR (bad file/path)";};
       if(vid.getAttribute("src")!==src)vid.src=src;
       vid.style.display="block";
       const _p=vid.play();
       if(_p&&_p.catch)_p.catch(()=>{});
     }
+    if(_hud)_hud.textContent="bg-debug: raw="+JSON.stringify(rawVal)+" -> VIDEO src="+src+" | zone="+(STATE.zone&&STATE.zone.id);
   } else {
     if(vid){vid.pause();vid.removeAttribute("src");vid.style.display="none";}
     gs.style.backgroundImage=`url("${src}")`;
+    if(_hud)_hud.textContent="bg-debug: raw="+JSON.stringify(rawVal)+" -> IMAGE src="+src+" | zone="+(STATE.zone&&STATE.zone.id);
   }
 }
 // Sets the game screen's background from the destination zone's own
