@@ -175,7 +175,7 @@ input{font-family:'Courier New',monospace;}
 #world-nav{flex-shrink:0;display:none;flex-direction:column;height:min(269px,42vh);overflow:hidden;}
 .tab-btn{flex:1;padding:7px 4px 6px;background:#000;border:none;color:#aaa;font-size:10px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0;text-align:center;white-space:nowrap;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent!important;-webkit-touch-callout:none;}
 .log-panel{padding:0 14px;}
-.log-panel:not(:empty){padding:6px 14px 4px;background:rgba(0,0,0,0.6);border-bottom:1px solid #333;}
+.log-panel:not(:empty){padding:6px 14px 4px;background:rgba(0,0,0,0.6);border-bottom:1px solid #666;}
 .tab-btn:active,.tab-btn:focus,.tab-btn:focus-visible{background:#000!important;outline:none!important;-webkit-tap-highlight-color:transparent!important;}
 .tab-btn.active{color:#fff;}
 .tab-content{padding:10px 14px 16px;flex:1;overflow-y:auto;min-height:0;touch-action:pan-y;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;}
@@ -3942,7 +3942,13 @@ function switchLogTab(tab){
       if(chatInput){chatInput.dataset.placeholder="Zone chat...";if(window._vkbRender)window._vkbRender(chatInput);}
     }
   }
-  const activeLog=el(tab==="chat"?"log-chat":tab==="party"?"log-party":tab==="guild"?"log-guild":tab==="system"?"log-system":tab==="loot"?"log-loot":"log-combat");
+  _scrollActiveLogToBottom();
+}
+// Scrolls whichever log tab is currently active all the way to the bottom.
+// Used on tab switch, zone change, entering/leaving combat, entering a subzone,
+// and subzone level advance, so the player always lands on the newest message.
+function _scrollActiveLogToBottom(){
+  const activeLog=el(activeLogTab==="chat"?"log-chat":activeLogTab==="party"?"log-party":activeLogTab==="guild"?"log-guild":activeLogTab==="system"?"log-system":activeLogTab==="loot"?"log-loot":"log-combat");
   if(activeLog)activeLog.scrollTop=99999;
 }
 async function openCharSheetPopup(name, username, onClose){
@@ -10922,7 +10928,7 @@ function _wireAdminButtons(){
 //  COMBAT UI
 // ========================================
 let _deathTicker=null;
-function showDeathScreen(onDone){
+function showDeathScreen(onDone, onMid){
   closePopup();
   _playEventMusic("death");
   if(_deathTicker){clearInterval(_deathTicker);_deathTicker=null;}
@@ -10975,6 +10981,8 @@ function showDeathScreen(onDone){
     if(secs>0) pulseCd();
     if(secs<=0) clearInterval(_deathTicker);
   },1000);
+  // Midpoint of the hold - background can load unseen behind the overlay here
+  setTimeout(()=>{ if(onMid)onMid(); },2500);
   // Fade out at 5.5s total (5s visible + 0.5s fade)
   setTimeout(()=>{
     if(scanline) scanline.style.display="none";
@@ -10982,7 +10990,7 @@ function showDeathScreen(onDone){
     setTimeout(()=>{overlay.style.pointerEvents="none"; onDone();},500);
   },5000);
 }
-function showBerserkWipeScreen(respawnName, onDone){
+function showBerserkWipeScreen(respawnName, onDone, onMid){
   closePopup();
   const overlay=el("berserk-overlay");
   if(!overlay){if(onDone)onDone();return;}
@@ -11016,12 +11024,14 @@ function showBerserkWipeScreen(respawnName, onDone){
     secs--;if(cd)cd.textContent=secs;
     if(secs<=0)clearInterval(_berserkTicker);
   },1000);
+  // Midpoint of the hold - background can load unseen behind the overlay here
+  setTimeout(()=>{ if(onMid)onMid(); },2500);
   setTimeout(()=>{
     overlay.style.transition="opacity 0.5s ease";overlay.style.opacity="0";
     setTimeout(()=>{overlay.style.pointerEvents="none";if(onDone)onDone();},500);
   },5000);
 }
-function showVictoryScreen(lootLines,onDone){
+function showVictoryScreen(lootLines,onDone,onMid){
   closePopup();
   _playEventMusic("victory");
   const overlay=el("victory-overlay");
@@ -11075,6 +11085,8 @@ function showVictoryScreen(lootLines,onDone){
   setTimeout(()=>spawnVictoryParticles(),1100);
   setTimeout(()=>spawnVictoryParticles(),2200);
   setTimeout(()=>spawnVictoryParticles(),3500);
+  // Midpoint of the hold - background can load unseen behind the overlay here
+  setTimeout(()=>{ if(onMid)onMid(); },2500);
   // Fade out at 5.5s total
   setTimeout(()=>{
     overlay.style.transition="opacity 0.5s ease";
@@ -11082,7 +11094,7 @@ function showVictoryScreen(lootLines,onDone){
     setTimeout(()=>{overlay.style.pointerEvents="none";onDone();},500);
   },5000);
 }
-function showEscapeScreen(onDone){
+function showEscapeScreen(onDone, onMid){
   closePopup();
   const overlay=el("escape-overlay");
   const titleEl=el("escape-title");
@@ -11102,6 +11114,8 @@ function showEscapeScreen(onDone){
     setTimeout(()=>{dividerEl.style.width="180px";},300);
     setTimeout(()=>{subEl.style.opacity="1";},700);
   }));
+  // Midpoint of the hold - background can load unseen behind the overlay here
+  setTimeout(()=>{ if(onMid)onMid(); },2500);
   setTimeout(()=>{
     overlay.style.transition="opacity 0.5s ease";overlay.style.opacity="0";
     setTimeout(()=>{overlay.style.pointerEvents="none";onDone();},500);
@@ -11109,7 +11123,7 @@ function showEscapeScreen(onDone){
 }
 
 // ── PvP Arena Screens ──────────────────────────────────────────────────────
-function _showPvPOverlay(id, onDone, duration=5000){
+function _showPvPOverlay(id, onDone, duration=5000, onMid){
   const overlay=el(id);
   if(!overlay){if(onDone)onDone();return;}
   const dmgO=el("dmg-overlay");if(dmgO)dmgO.innerHTML="";
@@ -11130,18 +11144,20 @@ function _showPvPOverlay(id, onDone, duration=5000){
     setTimeout(()=>{if(divider)divider.style.width="180px";},300);
     setTimeout(()=>{if(sub)sub.style.opacity="1";},700);
   }));
+  // Midpoint of the hold - background can load unseen behind the overlay here
+  setTimeout(()=>{ if(onMid)onMid(); },duration/2);
   setTimeout(()=>{
     overlay.style.transition="opacity 0.5s ease";overlay.style.opacity="0";
     setTimeout(()=>{overlay.style.pointerEvents="none";if(onDone)onDone();},500);
   },duration);
 }
-function showPvPMatchScreen(opponentName, onDone){
+function showPvPMatchScreen(opponentName, onDone, onMid){
   const vs=el("pvp-match-vs");
   if(vs)vs.textContent=`vs ${opponentName}`;
   // Update title to reflect actual mode
   const titleEl=el("pvp-match-title");
   if(titleEl){const mode=STATE._arenaQueue||STATE._lastArenaMode||"1v1";titleEl.textContent=`${mode.toUpperCase()} ARENA`;}
-  _showPvPOverlay("pvp-match-overlay",onDone,5000);
+  _showPvPOverlay("pvp-match-overlay",onDone,5000,onMid);
 }
 
 // ── Arena match confirmation overlay ─────────────────────────────────────────
@@ -11209,29 +11225,29 @@ function _dismissArenaConfirm(){
   const ov=el("arena-confirm-overlay");
   if(ov)ov.classList.remove("show");
 }
-function showPvPWinScreen(opponentName, onDone){
+function showPvPWinScreen(opponentName, onDone, onMid){
   const sub=el("pvp-win-sub");
   if(sub)sub.textContent=`${opponentName} has been defeated.`;
   _playEventMusic("victory");
-  _showPvPOverlay("pvp-win-overlay",onDone);
+  _showPvPOverlay("pvp-win-overlay",onDone,5000,onMid);
 }
-function showPvPLoseScreen(opponentName, onDone){
+function showPvPLoseScreen(opponentName, onDone, onMid){
   const sub=el("pvp-lose-sub");
   if(sub)sub.textContent=`Defeated by ${opponentName}.`;
   _playEventMusic("death");
-  _showPvPOverlay("pvp-lose-overlay",onDone);
+  _showPvPOverlay("pvp-lose-overlay",onDone,5000,onMid);
 }
-function showPvPForfeitScreen(onDone){
+function showPvPForfeitScreen(onDone, onMid){
   const sub=el("pvp-forfeit-sub");
   if(sub)sub.textContent="You fled from the arena.";
   _playEventMusic("flee");
-  _showPvPOverlay("pvp-forfeit-overlay",onDone);
+  _showPvPOverlay("pvp-forfeit-overlay",onDone,5000,onMid);
 }
-function showPvPDrawScreen(onDone){
+function showPvPDrawScreen(onDone, onMid){
   const sub=el("pvp-draw-sub");
   if(sub)sub.textContent="The match timed out. Counted as a loss.";
   _playEventMusic("draw");
-  _showPvPOverlay("pvp-draw-overlay",onDone);
+  _showPvPOverlay("pvp-draw-overlay",onDone,5000,onMid);
 }
 function showAttackLine(fromEl,toEl,color){
   if(!fromEl||!toEl)return;
@@ -12056,6 +12072,7 @@ async function startCombat(enemyList){
   el("world-nav").style.display="none";
   setCombatOverlaysVisible(true);
   renderCombatUI();
+  _scrollActiveLogToBottom();
 
   if(!_myUid||!_authToken){addLog("combat_info","Not connected. Please refresh.");return;}
 
@@ -12097,6 +12114,7 @@ function endCombatUI(){
   document.querySelectorAll(".dmg-popup").forEach(p=>p.remove());
   const lo=el("combat-line-overlay");if(lo)lo.innerHTML="";
   renderCombatUI._lastTbKey=null; // force title bar re-render on first tick of next combat
+  _scrollActiveLogToBottom();
 }
 
 // ── Party Combat WebSocket ────────────────────────────────────────────────────
@@ -13528,6 +13546,7 @@ function _handlePartyWsMessage(msg){
       _silenceAllMusic();
       showPvPMatchScreen(STATE._pvpOpponentName,()=>{
         STATE._activityMusicActive=_playActivityMusic(_arenaTrack);
+      },()=>{
         _playActivityBackground(_arenaBg);
       });
       renderWorldNav();
@@ -13639,18 +13658,19 @@ function _handlePartyWsMessage(msg){
       _syncPartyMembersFromWs(msg.members||[]);
       if(STATE.stateRef){STATE.stateRef.enemies=STATE.combatEnemies;STATE.stateRef.player=STATE.player;}
       renderCombatUI();
-      _dismissCombatTransition(()=>{
-        // PvP arena music is handled separately by showPvPMatchScreen's own
-        // transition (5s opponent-reveal screen) - don't double-trigger here.
-        if(!STATE._isPvP&&STATE._pendingActivityTrack!==undefined){
-          STATE._activityMusicActive=_playActivityMusic(STATE._pendingActivityTrack);
-          STATE._pendingActivityTrack=undefined;
-        }
-        if(!STATE._isPvP&&STATE._pendingActivityBackground!==undefined){
-          _playActivityBackground(STATE._pendingActivityBackground);
-          STATE._pendingActivityBackground=undefined;
-        }
-      });
+      // PvP arena music is handled separately by showPvPMatchScreen's own
+      // transition (5s opponent-reveal screen) - don't double-trigger here.
+      // Apply immediately (while the transition overlay is still fully opaque)
+      // rather than waiting for dismissal, so the swap is never visible.
+      if(!STATE._isPvP&&STATE._pendingActivityTrack!==undefined){
+        STATE._activityMusicActive=_playActivityMusic(STATE._pendingActivityTrack);
+        STATE._pendingActivityTrack=undefined;
+      }
+      if(!STATE._isPvP&&STATE._pendingActivityBackground!==undefined){
+        _playActivityBackground(STATE._pendingActivityBackground);
+        STATE._pendingActivityBackground=undefined;
+      }
+      _dismissCombatTransition();
       if(STATE._isPvP){
         addLog("combat_info","Arena fight started!");
       } else {
@@ -13692,7 +13712,7 @@ function _handlePartyWsMessage(msg){
         const _lvlGrid=el("enemy-grid");if(_lvlGrid)_lvlGrid.innerHTML="";
         // Dismiss transition first, then render combat UI so players never see
         // the combat screen appear behind/through the level transition overlay
-        _dismissCombatTransition(()=>{STATE._combatTransitioning=false;renderCombatUI();});
+        _dismissCombatTransition(()=>{STATE._combatTransitioning=false;renderCombatUI();_scrollActiveLogToBottom();});
         break;
       }
       // If this is a rejoin from login (not already in combat), show combat transition
@@ -14066,38 +14086,42 @@ function _handlePartyWsMessage(msg){
           addLog("ph",`Victory! ${oppName} defeated.`);
           showPvPWinScreen(oppName,()=>{
             _revertActivityMusic();
-            _revertActivityBackground();
             renderWorldNav();updateChatBar();
             _broadcastZone(STATE.zone.id);
             setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);
+          },()=>{
+            _revertActivityBackground();
           });
         } else if(msg.outcome==="draw"){
           addLog("ci","Draw. Counted as a loss.");
           showPvPDrawScreen(()=>{
             _revertActivityMusic();
-            _revertActivityBackground();
             renderWorldNav();updateChatBar();
             _broadcastZone(STATE.zone.id);
             setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);
+          },()=>{
+            _revertActivityBackground();
           });
         } else if(isForfeit){
           STATE._hasFled=false;
           addLog("death","Forfeited the arena fight.");
           showPvPForfeitScreen(()=>{
             _revertActivityMusic();
-            _revertActivityBackground();
             renderWorldNav();updateChatBar();
             _broadcastZone(STATE.zone.id);
             setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);
+          },()=>{
+            _revertActivityBackground();
           });
         } else {
           addLog("death",`Defeated by ${oppName}.`);
           showPvPLoseScreen(oppName,()=>{
             _revertActivityMusic();
-            _revertActivityBackground();
             renderWorldNav();updateChatBar();
             _broadcastZone(STATE.zone.id);
             setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);
+          },()=>{
+            _revertActivityBackground();
           });
         }
         break;
@@ -14153,10 +14177,11 @@ function _handlePartyWsMessage(msg){
         endCombatUI();
         showVictoryScreen(_lootLines,()=>{
           _revertActivityMusic();
-          _revertActivityBackground();
           renderWorldNav();updateChatBar();
           _broadcastZone(STATE.zone.id);
           setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);
+        },()=>{
+          _revertActivityBackground();
         });
         break;
       } else if(msg.outcome==="berserk"){
@@ -14176,7 +14201,7 @@ function _handlePartyWsMessage(msg){
         _safeZoneHeal();
         STATE.travelCooldown=60;startCooldownTicker();
         saveGame(true);
-        showBerserkWipeScreen(respawnZone.name,()=>{_updateZoneMusic(respawnZone.name, respawnZone.id);_updateZoneBackground(respawnZone.id);renderWorldNav();updateChatBar();setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);});
+        showBerserkWipeScreen(respawnZone.name,()=>{_updateZoneMusic(respawnZone.name, respawnZone.id);renderWorldNav();updateChatBar();setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);},()=>{_updateZoneBackground(respawnZone.id);});
         return;
       } else if(msg.outcome==="death"){
         // Determine respawn zone - use leader's zone from server, fallback to player's own setting
@@ -14201,9 +14226,10 @@ function _handlePartyWsMessage(msg){
           saveGame(true);
           showEscapeScreen(()=>{
             _updateZoneMusic(respawnZone.name, respawnZone.id);
-            _updateZoneBackground(respawnZone.id);
             renderWorldNav();updateChatBar();
             setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);
+          },()=>{
+            _updateZoneBackground(respawnZone.id);
           });
         } else {
           // Player died - show death screen, respawn with 1 HP
@@ -14214,7 +14240,7 @@ function _handlePartyWsMessage(msg){
           _safeZoneHeal();
           STATE.travelCooldown=60;startCooldownTicker();
           saveGame(true);
-          showDeathScreen(()=>{_updateZoneMusic(respawnZone.name, respawnZone.id);_updateZoneBackground(respawnZone.id);renderWorldNav();updateChatBar();setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);});
+          showDeathScreen(()=>{_updateZoneMusic(respawnZone.name, respawnZone.id);renderWorldNav();updateChatBar();setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);},()=>{_updateZoneBackground(respawnZone.id);});
         }
         return; // skip the shared setTimeout below
       } else if(msg.outcome==="ejected"){
@@ -14258,9 +14284,10 @@ function _handlePartyWsMessage(msg){
         saveGame(true);
         showEscapeScreen(()=>{
           _updateZoneMusic(fleeRespawnZone.name, fleeRespawnZone.id);
-          _updateZoneBackground(fleeRespawnZone.id);
           renderWorldNav();updateChatBar();
           setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);
+        },()=>{
+          _updateZoneBackground(fleeRespawnZone.id);
         });
         return;
       } else {
@@ -14839,6 +14866,10 @@ window.addEventListener("focus",_resumeInterruptedMedia);
 window.addEventListener("pageshow",_resumeInterruptedMedia);
 
 function showTravelScreen(zoneName, isSafe, onDone, zoneId){
+  // Wrap onDone so every zone-change path (leader travel, party-follow,
+  // passive zone-follow, zone-sync-on-join) scrolls chat to bottom on arrival.
+  const _origTravelOnDone=onDone;
+  onDone=function(){ _scrollActiveLogToBottom(); if(_origTravelOnDone)_origTravelOnDone(); };
   // Layer 1: destination name lock.
   // Drop any call that isn't for the locked destination zone.
   if(_travelDestName!==null && zoneName!==_travelDestName){ return; }
@@ -14939,6 +14970,12 @@ function showTravelScreen(zoneName, isSafe, onDone, zoneId){
       if(gen !== _travelCallGen) return;
       typeEl.style.animation="tr-fadein 0.7s ease forwards, tr-glitch2 9s ease 1s infinite";
     }, 700);
+    // Midpoint of the hold - load the destination background here, while the
+    // overlay still fully covers the screen, so it's never seen popping in.
+    setTimeout(()=>{
+      if(gen !== _travelCallGen) return;
+      _updateZoneBackground(zoneId);
+    }, 2500);
     // Fade out at 5s then 0.5s cleanup
     _trFadeTimer=setTimeout(()=>{
       if(gen !== _travelCallGen){ _trFadeTimer=null; return; }
@@ -14954,7 +14991,6 @@ function showTravelScreen(zoneName, isSafe, onDone, zoneId){
         if(particleEl) particleEl.innerHTML="";
         _travelDestName=null;
         _updateZoneMusic(zoneName, zoneId);
-        _updateZoneBackground(zoneId);
         onDone();
       }, 500);
     }, 5000);
