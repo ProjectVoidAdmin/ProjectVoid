@@ -1713,7 +1713,6 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 
 <!-- ═══════════════════════════════════ LOGIN ═══════════════════════════════════ -->
 <div id="login-screen" class="screen li-paused">
-  <audio id="login-bgm" src="music/Login.mp3" loop preload="auto"></audio>
   <video id="login-bg-video" muted loop playsinline autoplay disablepictureinpicture disableremoteplayback style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;"></video>
   <div id="login-bg-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,0);z-index:1;pointer-events:none;"></div>
   <div id="li-scanline"></div>
@@ -1913,8 +1912,6 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 @keyframes caught-badge-in{0%{opacity:0;transform:scale(0.5);}70%{transform:scale(1.12);}100%{opacity:1;transform:scale(1);}}
 @keyframes caught-glow-pulse{0%,100%{box-shadow:0 0 20px rgba(100,160,255,0.15),0 0 60px rgba(60,110,200,0.08);}50%{box-shadow:0 0 40px rgba(120,180,255,0.28),0 0 90px rgba(80,130,220,0.18);}}
 </style>
-<audio id="zone-bgm" loop preload="auto"></audio>
-<audio id="event-bgm" preload="auto"></audio>
 <div id="travel-overlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:#000;opacity:0;pointer-events:none;z-index:9998;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;">
   <!-- Scanline -->
   <div id="tr-scanline" style="display:none;"></div>
@@ -3401,6 +3398,147 @@ window.addEventListener("pagehide",()=>{
 const roll=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function el(id){return document.getElementById(id);}
+
+// ========================================
+//  BACKGROUND MUSIC — WEB AUDIO ENGINE (no OS media notification)
+// ========================================
+// Chrome shows a persistent system "media" / "Live notification" for ANY
+// actively-playing <audio>/<video> element once playback passes ~5s of real
+// audio focus — foreground or background, no exceptions, and there is no
+// supported page-level API to suppress it for a real media element (this is
+// a known, permanently-open Chromium limitation: w3c/mediasession#215).
+// The one documented way around it: Web Audio API playback (AudioContext +
+// buffer sources) never triggers that notification at all, because Chrome's
+// media-session integration only hooks into HTMLMediaElement.
+//
+// So background music no longer plays through real <audio> tags. Instead,
+// each BGM slot (login/zone/event) is one of these small wrapper objects,
+// shaped to match just the handful of <audio> properties/methods this
+// game's music code actually uses (.src, .loop, .paused, .currentTime,
+// .play(), .pause(), .removeAttribute("src")) so every existing call site —
+// _playEventMusic, _updateZoneMusic, _playActivityMusic, _silenceAllMusic,
+// _resumeInterruptedMedia, _pauseMusicForBackground, etc. — keeps working
+// completely unchanged. Only the plumbing underneath is different.
+let _pvAudioCtx=null;
+function _pvGetAudioCtx(){
+  if(!_pvAudioCtx){
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(AC){try{_pvAudioCtx=new AC();}catch(e){}}
+  }
+  return _pvAudioCtx;
+}
+// Mobile browsers require a user gesture before any sound can play — resume
+// the shared context on the first tap/keypress, same trigger the old
+// <audio> autoplay-retry code already relied on.
+function _pvUnlockAudioCtx(){
+  const ctx=_pvGetAudioCtx();
+  if(ctx&&ctx.state==="suspended")ctx.resume().catch(()=>{});
+}
+document.addEventListener("pointerdown",_pvUnlockAudioCtx,{passive:true});
+document.addEventListener("keydown",_pvUnlockAudioCtx);
+
+const _pvBufferCache={}; // src -> Promise<AudioBuffer>, so re-playing a track skips the network+decode
+function _pvLoadBuffer(src){
+  if(_pvBufferCache[src])return _pvBufferCache[src];
+  const ctx=_pvGetAudioCtx();
+  const p=fetch(src).then(r=>r.arrayBuffer()).then(buf=>ctx.decodeAudioData(buf));
+  p.catch(()=>{ if(_pvBufferCache[src]===p)delete _pvBufferCache[src]; }); // allow retry after a failed load
+  _pvBufferCache[src]=p;
+  return p;
+}
+
+function _PvBgmTrack(loop){
+  this._loop=!!loop;
+  this._src="";
+  this._buffer=null;
+  this._srcToken=0; // bumped on every .src= so a stale in-flight load can't clobber a newer one
+  this._node=null;  // live AudioBufferSourceNode, only while actually playing
+  this._startedAt=0; // ctx.currentTime when the node was last (re)started
+  this._offset=0;    // playback position in seconds
+  this._paused=true;
+}
+Object.defineProperty(_PvBgmTrack.prototype,"loop",{
+  get(){return this._loop;},
+  set(v){this._loop=!!v; if(this._node)this._node.loop=this._loop;}
+});
+Object.defineProperty(_PvBgmTrack.prototype,"paused",{get(){return this._paused;}});
+Object.defineProperty(_PvBgmTrack.prototype,"src",{
+  get(){return this._src;},
+  set(v){
+    v=v||"";
+    if(v===this._src)return;
+    this._src=v; this._buffer=null; this._offset=0;
+    this._stopNode(); this._paused=true;
+  }
+});
+Object.defineProperty(_PvBgmTrack.prototype,"currentTime",{
+  get(){
+    const ctx=_pvGetAudioCtx();
+    if(!this._paused&&this._node&&ctx)return this._offset+(ctx.currentTime-this._startedAt);
+    return this._offset;
+  },
+  set(v){
+    this._offset=v||0;
+    if(!this._paused&&this._buffer)this._restartFrom(this._offset);
+  }
+});
+_PvBgmTrack.prototype._stopNode=function(){
+  if(this._node){
+    const n=this._node; this._node=null;
+    n.onended=null;
+    try{n.stop();}catch(e){}
+    try{n.disconnect();}catch(e){}
+  }
+};
+_PvBgmTrack.prototype._restartFrom=function(offsetSec){
+  const ctx=_pvGetAudioCtx(); const buf=this._buffer;
+  if(!ctx||!buf)return;
+  this._stopNode();
+  const node=ctx.createBufferSource();
+  node.buffer=buf; node.loop=this._loop;
+  node.connect(ctx.destination);
+  const dur=buf.duration||0;
+  const startAt=dur?((offsetSec||0)%dur+dur)%dur:0;
+  node.onended=()=>{ if(this._node===node){this._node=null; this._paused=true;} };
+  try{ node.start(0,startAt); }catch(e){ return; }
+  this._node=node; this._startedAt=ctx.currentTime; this._offset=startAt; this._paused=false;
+};
+_PvBgmTrack.prototype.removeAttribute=function(name){
+  if(name==="src"){ this._stopNode(); this._src=""; this._buffer=null; this._offset=0; this._paused=true; }
+};
+_PvBgmTrack.prototype.play=function(){
+  const src=this._src;
+  if(!src)return Promise.resolve();
+  _pvUnlockAudioCtx();
+  const token=++this._srcToken;
+  const startOffset=this._offset||0;
+  return _pvLoadBuffer(src).then(buf=>{
+    if(token!==this._srcToken||this._src!==src)return; // superseded by a newer .src=/.play() since this load started
+    this._buffer=buf;
+    this._restartFrom(startOffset);
+  });
+};
+_PvBgmTrack.prototype.pause=function(){
+  if(this._paused)return;
+  const ctx=_pvGetAudioCtx();
+  if(ctx&&this._node)this._offset=this._offset+(ctx.currentTime-this._startedAt);
+  this._stopNode();
+  this._paused=true;
+};
+
+// One shared instance per BGM slot — swap in wherever the old code did
+// el("login-bgm")/el("zone-bgm")/el("event-bgm").
+const _pvBgmTracks={
+  "login-bgm": new _PvBgmTrack(true),
+  "zone-bgm":  new _PvBgmTrack(true),
+  "event-bgm": new _PvBgmTrack(false),
+};
+// login-bgm's track used to come from a hardcoded src="music/Login.mp3" on the
+// <audio> tag itself — nothing ever set it via JS, so the wrapper needs the
+// same default or the login theme would never load.
+_pvBgmTracks["login-bgm"].src="music/Login.mp3";
+function _pvBgm(id){ return _pvBgmTracks[id]||null; }
+
 function escHtml(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 function _capFirst(s){return s?s.charAt(0).toUpperCase()+s.slice(1):s;}
 
@@ -4072,7 +4210,7 @@ function showScreen(id){
   _screens.forEach(s=>s.classList.remove("active"));
   el(id).classList.add("active");
   // Login screen background music: play while login-screen is active, stop otherwise.
-  const _bgm=el("login-bgm");
+  const _bgm=_pvBgm("login-bgm");
   if(_bgm){
     if(id==="login-screen"){
       _bgm.currentTime=0;
@@ -4895,12 +5033,12 @@ var _DEV_TABS = [
   {key:'equipment',   label:'EQUIPMENT'},
   {key:'action',      label:'ACTION'},
   {key:'monster',     label:'HOSTILE'},
-  {key:'zone',        label:'ZONE'},
   {key:'quest',       label:'QUEST'},
-  {key:'packages',    label:'PACKAGES'},
-  {key:'queue',       label:'QUEUE'},
-  {key:'dashboard',   label:'DASHBOARD'},
+  {key:'zone',        label:'ZONE'},
+  {key:'packages',    label:'PACKAGE'},
   {key:'browse',      label:'BROWSE'},
+  {key:'dashboard',   label:'DASHBOARD'},
+  {key:'queue',       label:'QUEUE'},
 ];
 
 // ── Special tabs that hide mode/footer/ai bars ─────────────────────────────────
@@ -5399,10 +5537,16 @@ function _devMakeVfieldAutocomplete(vfieldEl,category){
       }
     } else { _refresh(); }
   }
-  vfieldEl.addEventListener('pointerup',function(){setTimeout(_fetchAndRefresh,50);},{passive:true});
-  new MutationObserver(_refresh).observe(vfieldEl,{childList:true,subtree:true});
+  vfieldEl.addEventListener('pointerup',function(){window._devAcActiveId=vfieldEl.id;setTimeout(_fetchAndRefresh,50);},{passive:true});
+  // Only react to DOM mutations on THIS field while it is the one actively being edited.
+  // Otherwise a re-render elsewhere (e.g. _devSeedSubboxVkb re-syncing sibling rows) would
+  // fire every wired field's observer at once and pop open every dropdown in the box.
+  new MutationObserver(function(){ if(window._devAcActiveId===vfieldEl.id)_refresh(); }).observe(vfieldEl,{childList:true,subtree:true});
   document.addEventListener('pointerdown',function(ev){
-    if(!par.contains(ev.target))dropdown.style.display='none';
+    if(!par.contains(ev.target)){
+      dropdown.style.display='none';
+      if(window._devAcActiveId===vfieldEl.id)window._devAcActiveId=null;
+    }
   },{passive:true});
 }
 function _devRenderContent(){
@@ -6523,7 +6667,7 @@ function _devRenderPackages(container){
 
     // ── Divider ───────────────────────────────────────────────────────────
     html+='<div style="border-top:1px solid #0d1a24;margin:12px 0 10px;"></div>';
-    html+='<div style="font-size:8px;color:#1a3a4a;letter-spacing:2px;font-family:\'Courier New\',monospace;margin-bottom:8px;">SUBMITTED PACKAGES</div>';
+    html+='<div style="font-size:8px;color:#1a3a4a;letter-spacing:2px;font-family:\'Courier New\',monospace;margin-bottom:8px;">SUBMITTED PACKAGE</div>';
 
     // ── Packages list ──────────────────────────────────────────────────────
     if(!packages||!packages.length){
@@ -10313,6 +10457,23 @@ function _devClearValidation(){
   _devS.aiResult=null;
 }
 
+// After a successful submit-for-review, close out the edit and return the tab to a
+// clean + NEW state — same reset the + NEW mode button performs — so the stale
+// edit form and its warnings don't linger on screen.
+function _devResetToNewAfterSubmit(){
+  _devS.mode='new'; _devS.form={}; _devS.editId=null; _devS.editName=null;
+  if(_devS.effectsList) _devS.effectsList={};
+  _devS._fishBehavior={};
+  _devS.lootList={}; _devS.hActList={}; _devS.phaseList={};
+  _devS.assignList={}; _devS.subzoneList={}; _devS.objList={};
+  _devS.branchList={}; _devS.trigList={}; _devS.rewardList={}; _devS.marketData={};
+  if(window._vkbClear) window._vkbClear();
+  document.querySelectorAll('.dev-mode-btn').forEach(function(x){x.classList.toggle('dev-mode-active',x.dataset.devmode==='new');});
+  var badge=document.getElementById('dev-ver-badge'); if(badge)badge.textContent='';
+  _devClearValidation();
+  _devRenderContent();
+}
+
 function _devRunAiAnalysis(){
   // Force-sync all sub-box lists from VKB before reading form
   // This ensures action names, loot values etc. typed by user are captured
@@ -10593,7 +10754,10 @@ function _devSave(action){
   } else {
     STATE._devOnSubmit=function(msg){
       STATE._devOnSubmit=null;
-      if(msg.ok){addLog("system","[DEV] Submitted for review: "+name+" (submission #"+msg.id+")");}
+      if(msg.ok){
+        addLog("system","[DEV] Submitted for review: "+name+" (submission #"+msg.id+")");
+        _devResetToNewAfterSubmit();
+      }
       else if(msg.conflict){addLog("err","[DEV] "+msg.error);}
       else{addLog("err","[DEV] Submit failed: "+(msg.error||'unknown'));}
     };
@@ -12786,7 +12950,7 @@ function _handlePartyWsMessage(msg){
           // landing before the first get_live_zones round trip finished - the
           // zone-bgm element would have been left silent with no src at all.
           // Start it now instead of leaving it silent until the next zone change.
-          const _zbgm=document.getElementById("zone-bgm");
+          const _zbgm=_pvBgm("zone-bgm");
           if(_zbgm&&!_zbgm.src&&!STATE.inCombat&&!STATE._activityMusicActive){
             _updateZoneMusic(merged.name, merged.id);
             _updateZoneBackground(merged.id);
@@ -12913,7 +13077,7 @@ function _handlePartyWsMessage(msg){
           // since catalog_delta only patched STATE.zone/ZONES in memory and was
           // missing this restart. Start it now instead of leaving it silent
           // until the next zone change.
-          const _zbgm=document.getElementById("zone-bgm");
+          const _zbgm=_pvBgm("zone-bgm");
           if(_zbgm&&!_zbgm.src&&!STATE.inCombat&&!STATE._activityMusicActive){
             _updateZoneMusic(merged.name, merged.id);
             _updateZoneBackground(merged.id);
@@ -14649,7 +14813,7 @@ const _EVENT_MUSIC={victory:"Victory.mp3",death:"Death.mp3",flee:"Flee.mp3",bers
 function _playEventMusic(key){
   const file=_EVENT_MUSIC[key];
   const src=_resolveMusicSrc(file);
-  const ev=el("event-bgm");
+  const ev=_pvBgm("event-bgm");
   if(!ev)return;
   ev.pause();
   if(src){
@@ -14662,14 +14826,14 @@ function _playEventMusic(key){
   }
 }
 function _stopEventMusic(){
-  const ev=el("event-bgm");
+  const ev=_pvBgm("event-bgm");
   if(ev){ev.pause();ev.currentTime=0;ev.removeAttribute("src");}
 }
 function _updateZoneMusic(zoneName, zoneId){
   _stopEventMusic();
-  const loginBgm=el("login-bgm");
+  const loginBgm=_pvBgm("login-bgm");
   if(loginBgm){loginBgm.pause();loginBgm.currentTime=0;}
-  const bgm=el("zone-bgm");
+  const bgm=_pvBgm("zone-bgm");
   if(!bgm)return;
   bgm.pause();
   const zoneObj=zoneId?ZONES.find(z=>z.id===zoneId):null;
@@ -14694,7 +14858,7 @@ function _updateZoneMusic(zoneName, zoneId){
 function _playActivityMusic(rawTrack){
   const src=_resolveMusicSrc(rawTrack);
   if(!src)return false;
-  const bgm=el("zone-bgm");
+  const bgm=_pvBgm("zone-bgm");
   if(!bgm)return false;
   bgm.pause();
   bgm.src=src;
@@ -14722,9 +14886,9 @@ function _revertActivityMusic(){
 // it; the appropriate track is started separately once that screen ends.
 function _silenceAllMusic(){
   _stopEventMusic();
-  const loginBgm=el("login-bgm");
+  const loginBgm=_pvBgm("login-bgm");
   if(loginBgm){loginBgm.pause();loginBgm.currentTime=0;}
-  const bgm=el("zone-bgm");
+  const bgm=_pvBgm("zone-bgm");
   if(bgm){bgm.pause();bgm.removeAttribute("src");bgm.currentTime=0;}
 }
 
@@ -14821,7 +14985,7 @@ function _resumeInterruptedMedia(){
   const activeId=activeScreen?activeScreen.id:null;
   // Login screen theme + background video — only while that screen is showing.
   if(activeId==="login-screen"){
-    const _bgm=el("login-bgm");
+    const _bgm=_pvBgm("login-bgm");
     if(_bgm&&_bgm.paused&&_bgm.src){
       const _p=_bgm.play();
       if(_p&&_p.catch)_p.catch(()=>{});
@@ -14834,7 +14998,7 @@ function _resumeInterruptedMedia(){
   }
   // Zone / activity / boss music — covers all of these since they all play
   // through the same zone-bgm element.
-  const bgm=el("zone-bgm");
+  const bgm=_pvBgm("zone-bgm");
   if(bgm&&bgm.paused&&bgm.src){
     const _p=bgm.play();
     if(_p&&_p.catch)_p.catch(()=>{});
@@ -14846,17 +15010,19 @@ function _resumeInterruptedMedia(){
 // ========================================
 //  PAUSE MUSIC WHEN BACKGROUNDED
 // ========================================
-// Android Chrome shows a persistent "now playing" notification for any tab
-// with actively-playing audio. Since we deliberately want BGM to pause while
-// the game is backgrounded (screen off, app switched away, etc.), pause it
-// here — currentTime/src are left untouched so _resumeInterruptedMedia()
-// can pick the track back up seamlessly when the app becomes active again.
+// Now purely a battery/CPU courtesy — since BGM plays through the Web Audio
+// engine above instead of real <audio> elements, it was never going to
+// trigger Chrome's "now playing" notification in the first place, backgrounded
+// or not. Still worth pausing while the app is out of view (screen off, app
+// switched away, etc.) so it isn't burning cycles decoding audio nobody can
+// hear. currentTime/src are left untouched so _resumeInterruptedMedia() can
+// pick the track back up seamlessly when the app becomes active again.
 function _pauseMusicForBackground(){
-  const _bgm=el("login-bgm");
+  const _bgm=_pvBgm("login-bgm");
   if(_bgm&&!_bgm.paused)_bgm.pause();
   const _bgVid=el("login-bg-video");
   if(_bgVid&&!_bgVid.paused)_bgVid.pause();
-  const bgm=el("zone-bgm");
+  const bgm=_pvBgm("zone-bgm");
   if(bgm&&!bgm.paused)bgm.pause();
 }
 document.addEventListener("visibilitychange",()=>{ if(document.hidden)_pauseMusicForBackground(); });
