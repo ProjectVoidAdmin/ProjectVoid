@@ -25,6 +25,11 @@ html,body{height:100svh;max-height:100svh;background:#000;font-family:'Courier N
 #rotate-lock-overlay .rl-icon{font-size:48px;margin-bottom:16px;animation:rl-spin 1.8s ease-in-out infinite;}
 #rotate-lock-overlay .rl-text{font-size:14px;letter-spacing:2px;color:#bbb;}
 @keyframes rl-spin{0%,100%{transform:rotate(0deg);}50%{transform:rotate(-90deg);}}
+#fs-resume-overlay{display:none;position:fixed;inset:0;z-index:999998;background:#000;color:#fff;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;font-family:'Courier New',monospace;cursor:pointer;}
+#fs-resume-overlay.show{display:flex;}
+#fs-resume-overlay .fr-icon{font-size:40px;margin-bottom:16px;animation:fr-pulse 1.6s ease-in-out infinite;}
+#fs-resume-overlay .fr-text{font-size:14px;letter-spacing:2px;color:#bbb;}
+@keyframes fr-pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
 *::-moz-selection{background:transparent!important;color:inherit!important;}
 input,textarea{-webkit-user-select:text!important;user-select:text!important;-webkit-touch-callout:default!important;}
 button:active,button:focus,button:focus-visible{outline:none!important;box-shadow:none!important;-webkit-tap-highlight-color:transparent!important;-webkit-appearance:none!important;}
@@ -1333,6 +1338,11 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   <div class="rl-icon">⟳</div>
   <div class="rl-text">ROTATE YOUR DEVICE<br/>BACK TO PORTRAIT</div>
 </div>
+
+<div id="fs-resume-overlay">
+  <div class="fr-icon">⛶</div>
+  <div class="fr-text">TAP TO CONTINUE</div>
+</div>
 <script>
 // Hide mobile URL bar on load - scroll trick forces browser chrome to collapse
 (function(){
@@ -2256,6 +2266,9 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
     }catch(e){}
   }
   window._lockPortrait=_lockPortrait;
+  function _isFsActive(){
+    return !!(document.fullscreenElement||document.webkitFullscreenElement)||window.matchMedia("(display-mode: standalone)").matches;
+  }
   function _forceFullscreen(){
     var _dlOv=document.getElementById("devlog-overlay");
     if(_dlOv&&_dlOv.style.display!=="none")return;
@@ -2266,24 +2279,50 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
     else if(el.webkitRequestFullscreen)el.webkitRequestFullscreen();
   }
   window._forceFullscreen=_forceFullscreen;
-  // Any tap/click/key re-enters fullscreen if it's not already active.
-  // Deliberately NOT listening on pointerdown/touchstart here: Android doesn't always
-  // treat pointerdown as valid user-activation for the Fullscreen API, and a rejected/
-  // stalled request from it can freeze the visual frame until a second tap forces a
-  // repaint - i.e. exactly the "extra throwaway tap" problem. click fires as part of
-  // the same physical tap and is the reliable activation source, so it alone is used.
+
+  // ── "Tap to continue" overlay: shown any time we're not in fullscreen ────
+  var _frOv=null;
+  function _updateFsResumeOverlay(){
+    if(!_frOv)_frOv=document.getElementById("fs-resume-overlay");
+    if(!_frOv)return;
+    var _dlOv=document.getElementById("devlog-overlay");
+    if(_dlOv&&_dlOv.style.display!=="none"){_frOv.classList.remove("show");return;}
+    if(_isFsActive())_frOv.classList.remove("show");
+    else _frOv.classList.add("show");
+  }
+  window._updateFsResumeOverlay=_updateFsResumeOverlay;
+
+  // Tapping anywhere (including the overlay) re-enters fullscreen on pointerdown,
+  // so it happens the instant a finger touches the glass rather than waiting for
+  // the click that follows it.
+  document.addEventListener("pointerdown",function(){
+    if(!_isFsActive())_forceFullscreen();
+  },true);
+  // click/keydown remain as a fallback for input types that don't fire pointerdown
+  // (e.g. keyboard) or environments where pointerdown activation is rejected.
   document.addEventListener("click",_forceFullscreen);
   document.addEventListener("keydown",_forceFullscreen);
   document.addEventListener("fullscreenchange",function(){
     if(document.fullscreenElement)_lockPortrait();
+    _updateFsResumeOverlay();
   });
-  document.addEventListener("webkitfullscreenchange",_lockPortrait);
+  document.addEventListener("webkitfullscreenchange",function(){
+    _lockPortrait();
+    _updateFsResumeOverlay();
+  });
   // Deliberately NOT re-forcing from the fullscreenchange event itself - that's what caused
   // the back button to need multiple taps (it was fighting the exit gesture in real time).
   // The next ordinary tap on the page (from the listeners above) will bring it back.
   // Try immediately on load (will fail without gesture but costs nothing)
   _forceFullscreen();
   _lockPortrait();
+  _updateFsResumeOverlay();
+  document.addEventListener("visibilitychange",function(){
+    if(document.visibilityState==="visible")_updateFsResumeOverlay();
+  });
+  // Safety net: some browsers exit fullscreen (e.g. via OS gesture) without firing
+  // fullscreenchange reliably, so poll lightly to keep the overlay in sync.
+  setInterval(_updateFsResumeOverlay,800);
 })();
 
 // ========================================
