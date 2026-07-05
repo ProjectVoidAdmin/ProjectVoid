@@ -161,7 +161,6 @@ input{font-family:'Courier New',monospace;}
 .bar-fill{height:100%;border-radius:2px;transition:width 0.2s;}
 /* Action grid (combat) */
 #action-grid{flex-shrink:1;padding:6px 12px 12px;display:none;min-height:0;}
-#action-grid-label{font-size:9px;color:#bbb;letter-spacing:2px;margin-bottom:5px;text-align:center;}
 #action-buttons{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;}
 .action-btn{background:#000;border:1px solid #554400;border-radius:4px;padding:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:min(56px,8vh);gap:2px;}
 .action-btn.has-action{border-color:#4a3500;}
@@ -419,9 +418,6 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 
 /* Chat send button */
 #chat-send{color:#ddd!important;border-color:#666!important;}
-
-/* Action grid label */
-#action-grid-label{color:#bbb!important;}
 
 /* Enemy HP text */
 .enemy-hp-txt{color:#ccc!important;}
@@ -1805,7 +1801,7 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   </div>
 
   <!-- Player bars (combat only) -->
-  <div id="player-bars" style="flex-shrink:0;padding:6px 14px 4px;display:none;"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;">
+  <div id="player-bars" style="flex-shrink:0;padding:10px 14px 4px;display:none;"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;">
     <div id="player-card" style="border:1px solid #1a4d1a;border-radius:4px;padding:3px 6px;background:#000;width:100%;box-sizing:border-box;position:relative;overflow:visible;min-height:min(44px,7vh);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;">
       <div id="player-card-name" class="enemy-name"></div>
       <div class="enemy-bar-bg" style="margin-bottom:1px;width:100%;"><div class="bar-fill" id="hp-bar" style="width:100%;background:#33cc44;border-radius:2px;transition:width 0.2s;"></div></div>
@@ -1818,7 +1814,6 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 
   <!-- Action grid (combat) -->
   <div id="action-grid">
-    <div id="action-grid-label">ACTIONS</div>
     <div id="action-buttons"></div>
   </div>
 
