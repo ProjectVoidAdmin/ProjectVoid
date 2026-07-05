@@ -107,7 +107,7 @@ input{font-family:'Courier New',monospace;}
 .chat-player-box-btn{width:100%;padding:12px 14px;background:#000;border:none;border-bottom:1px solid #1a1a1a;color:#aaa;font-size:11px;letter-spacing:2px;font-family:'Courier New',monospace;text-align:left;cursor:pointer;display:block;-webkit-tap-highlight-color:transparent;box-sizing:border-box;}
 .chat-player-box-btn:last-child{border-bottom:none;}
 /* Game screen */
-#game-screen{background:#000;min-height:0;}
+#game-screen{background:#000;background-size:cover;background-position:center;background-repeat:no-repeat;position:relative;min-height:0;}
 /* Title bar */
 #title-bar{flex-shrink:0;padding:6px 14px 5px;}
 .title-bar-inner{display:flex;justify-content:space-between;align-items:center;}
@@ -1755,6 +1755,8 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 
 <!-- ════════════════════════════════ GAME ══════════════════════════════════════ -->
 <div id="game-screen" class="screen">
+  <video id="zone-bg-video" muted loop playsinline autoplay disablepictureinpicture disableremoteplayback style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;"></video>
+  <div id="zone-bg-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,0);z-index:-1;pointer-events:none;"></div>
   <!-- Title bar -->
   <div id="title-bar">
     <div class="title-bar-inner">
@@ -4673,7 +4675,7 @@ function confirmLogout(){
     // kill it, since the 250ms fade-out (and navigation itself, on a slow
     // connection) would otherwise leave zone/boss/login music audibly playing.
     if(typeof _silenceAllMusic==='function') _silenceAllMusic();
-    if(typeof STATE!=='undefined'){ STATE._activityMusicActive=false; STATE._pendingActivityTrack=undefined; }
+    if(typeof STATE!=='undefined'){ STATE._activityMusicActive=false; STATE._pendingActivityTrack=undefined; STATE._pendingActivityBackground=undefined; }
     const _lgLbv=document.getElementById('login-bg-video');
     if(_lgLbv){ _lgLbv.pause(); }
     // Close WS immediately
@@ -4718,6 +4720,7 @@ function doLogout(){
   _silenceAllMusic();
   STATE._activityMusicActive=false;
   STATE._pendingActivityTrack=undefined;
+  STATE._pendingActivityBackground=undefined;
   const _lbv=document.getElementById("login-bg-video");
   if(_lbv){_lbv.pause();}
   // Reset deferred data flag so next login re-fetches
@@ -5002,10 +5005,12 @@ var _DEV_FIELDS = {
     {k:'rarity',       l:'Rarity',        t:'select', req:true, opts:['Common','Uncommon','Rare','Epic','Legendary','Mythic']},
     {k:'respawnRule',  l:'Type',          t:'select', req:true, opts:['Safe','Danger']},
     {k:'music',        l:'Music Track',   t:'text', ph:'e.g. Duskwatch.mp3 (uploaded to /music) — leave blank for none'},
+    {k:'background',   l:'Background',    t:'text', ph:'e.g. Duskwatch.png or Duskwatch.mp4 (uploaded to /background) — leave blank for none'},
     {k:'exploreMusic',   l:'Explore Music',      t:'text', ph:'e.g. DuskwatchExplore.mp3 — plays during Explore, leave blank to keep zone music', showIf:{k:'respawnRule',v:'Danger'}},
     {k:'arenaMusic1v1',  l:'Arena Music (1v1)',  t:'text', ph:'e.g. Arena1v1.mp3 — leave blank for no arena music', showIf:{k:'respawnRule',v:'Safe'}},
     {k:'arenaMusic2v2',  l:'Arena Music (2v2)',  t:'text', ph:'e.g. Arena2v2.mp3 — leave blank for no arena music', showIf:{k:'respawnRule',v:'Safe'}},
     {k:'arenaMusic4v4',  l:'Arena Music (4v4)',  t:'text', ph:'e.g. Arena4v4.mp3 — leave blank for no arena music', showIf:{k:'respawnRule',v:'Safe'}},
+    {k:'arenaBackground', l:'Arena Background', t:'text', ph:'e.g. Arena.png or Arena.mp4 — leave blank to keep zone background', showIf:{k:'respawnRule',v:'Safe'}},
     {k:'_market',      l:'Market',        t:'marketbox',   showIf:{k:'respawnRule',v:'Safe'}},
     {k:'_assignments', l:'Hostiles',      t:'assignmentsbox', showIf:{k:'respawnRule',v:'Danger'}},
     {k:'_subzones',    l:'Subzones',      t:'subzonesbox'},
@@ -8229,12 +8234,17 @@ function _devRenderSubzonesBox(container, tab, existingData) {
       }).join('');
       var canAddHostile = lv._hostiles.length < 4;
       var bossMusicVid = 'devlv_'+lkey+'_'+lvIdx+'_bossmusic';
+      var bossBackgroundVid = 'devlv_'+lkey+'_'+lvIdx+'_bossbackground';
       var bossToggleHtml = '<label style="font-size:9px;color:#cc8888;display:flex;align-items:center;gap:4px;cursor:pointer;margin:8px 0 4px;">'
         +'<input type="checkbox" class="dev-lv-boss-toggle" data-lv-boss-szidx="'+szIdx+'" data-lv-boss-lvidx="'+lvIdx+'"'+(lv.isBoss?' checked':'')+' style="accent-color:#cc2222;width:13px;height:13px;" /> BOSS LEVEL</label>';
       var bossMusicHtml = lv.isBoss
         ? '<div class="dev-sub-col-label" style="margin:2px 0 4px;">BOSS MUSIC <span style="color:#1a3a5a;font-size:9px;">(plays instantly on entering this level)</span></div>'
           +'<div class="vfield dev-vfield dev-effect-vfield" id="'+bossMusicVid+'" data-vfield="'+bossMusicVid+'" data-maxlen="80" data-ph="e.g. BossFight.mp3">'
           +(lv.bossMusic?'<span class="vfield-text">'+lv.bossMusic+'</span>':'')
+          +'</div>'
+          +'<div class="dev-sub-col-label" style="margin:6px 0 4px;">BOSS BACKGROUND <span style="color:#1a3a5a;font-size:9px;">(shows instantly on entering this level)</span></div>'
+          +'<div class="vfield dev-vfield dev-effect-vfield" id="'+bossBackgroundVid+'" data-vfield="'+bossBackgroundVid+'" data-maxlen="80" data-ph="e.g. BossFight.png or BossFight.mp4">'
+          +(lv.bossBackground?'<span class="vfield-text">'+lv.bossBackground+'</span>':'')
           +'</div>'
         : '';
       return '<div class="dev-sub-block" style="margin-bottom:6px;">'
@@ -8314,7 +8324,7 @@ function _devRenderSubzonesBox(container, tab, existingData) {
         _render();
       });
     });
-    levelsContainer.querySelectorAll('[id^="devlv_"]:not([id$="_bossmusic"])').forEach(function(vf){_devMakeVfieldAutocomplete(vf,'hostile');});
+    levelsContainer.querySelectorAll('[id^="devlv_"]:not([id$="_bossmusic"]):not([id$="_bossbackground"])').forEach(function(vf){_devMakeVfieldAutocomplete(vf,'hostile');});
     // Wire boss level toggle
     levelsContainer.querySelectorAll('.dev-lv-boss-toggle').forEach(function(chk){
       chk.addEventListener('change',function(){
@@ -8324,7 +8334,7 @@ function _devRenderSubzonesBox(container, tab, existingData) {
         var s=(_devS.subzoneList[tab]||[])[si];
         if(!s||!s._levels||!s._levels[li])return;
         s._levels[li].isBoss=chk.checked;
-        if(!chk.checked)s._levels[li].bossMusic='';
+        if(!chk.checked){s._levels[li].bossMusic='';s._levels[li].bossBackground='';}
         _devS.form['_subzones']=JSON.stringify(_devS.subzoneList[tab]||[]);
         _render();
       });
@@ -8437,6 +8447,11 @@ function _devRenderSubzonesBox(container, tab, existingData) {
         +'<div class="vfield dev-vfield dev-effect-vfield" id="'+vbase+'_music" data-vfield="'+vbase+'_music" data-maxlen="80" data-ph="e.g. GoblinDungeon.mp3 — leave blank to keep zone music">'
         +(sub.music?'<span class="vfield-text">'+sub.music+'</span>':'')
         +'</div></div>'
+        +'<div style="margin-bottom:5px;">'
+        +'<div class="dev-sub-col-label">BACKGROUND</div>'
+        +'<div class="vfield dev-vfield dev-effect-vfield" id="'+vbase+'_background" data-vfield="'+vbase+'_background" data-maxlen="80" data-ph="e.g. GoblinDungeon.png or GoblinDungeon.mp4 — leave blank to keep zone background">'
+        +(sub.background?'<span class="vfield-text">'+sub.background+'</span>':'')
+        +'</div></div>'
         +(isFishing?''
           :'<div style="margin-bottom:5px;">'
           +'<div class="dev-sub-col-label">LAYOUT / MECHANICS</div>'
@@ -8540,6 +8555,9 @@ function _devRenderSubzonesBox(container, tab, existingData) {
       // Sync music track for all subzone types
       var mv=window._vkbGetVal?window._vkbGetVal('devsz_'+t+'_'+idx+'_music'):null;
       if(mv!==null&&mv!==undefined&&mv!=='')sub.music=mv;
+      // Sync background for all subzone types
+      var bgv=window._vkbGetVal?window._vkbGetVal('devsz_'+t+'_'+idx+'_background'):null;
+      if(bgv!==null&&bgv!==undefined&&bgv!=='')sub.background=bgv;
       // Sync layout only for non-fishing subzones
       if(sub.type!=='Fishing'){
         var lv=window._vkbGetVal?window._vkbGetVal('devsz_'+t+'_'+idx+'_layout'):null;
@@ -8556,6 +8574,8 @@ function _devRenderSubzonesBox(container, tab, existingData) {
           });
           var bmv=window._vkbGetVal?window._vkbGetVal('devlv_'+t+'_sz'+idx+'_'+lvIdx+'_bossmusic'):null;
           if(bmv!==null&&bmv!==undefined&&bmv!=='')lvl.bossMusic=bmv;
+          var bbv=window._vkbGetVal?window._vkbGetVal('devlv_'+t+'_sz'+idx+'_'+lvIdx+'_bossbackground'):null;
+          if(bbv!==null&&bbv!==undefined&&bbv!=='')lvl.bossBackground=bbv;
         });
       }
     });
@@ -10320,6 +10340,9 @@ function _devRunAiAnalysis(){
       // Sync music track for all subzone types
       var mv=window._vkbGetVal?window._vkbGetVal('devsz_'+_preSaveCat+'_'+idx+'_music'):null;
       if(mv!==null&&mv!==undefined)sub.music=mv;
+      // Sync background for all subzone types
+      var bgv=window._vkbGetVal?window._vkbGetVal('devsz_'+_preSaveCat+'_'+idx+'_background'):null;
+      if(bgv!==null&&bgv!==undefined)sub.background=bgv;
       // Sync layout only for non-fishing subzones
       if(sub.type!=='Fishing'){
         var lv=window._vkbGetVal?window._vkbGetVal('devsz_'+_preSaveCat+'_'+idx+'_layout'):null;
@@ -10335,6 +10358,8 @@ function _devRunAiAnalysis(){
           });
           var bmv=window._vkbGetVal?window._vkbGetVal('devlv_'+_preSaveCat+'_sz'+idx+'_'+lvIdx+'_bossmusic'):null;
           if(bmv!==null&&bmv!==undefined)lvl.bossMusic=bmv;
+          var bbv=window._vkbGetVal?window._vkbGetVal('devlv_'+_preSaveCat+'_sz'+idx+'_'+lvIdx+'_bossbackground'):null;
+          if(bbv!==null&&bbv!==undefined)lvl.bossBackground=bbv;
         });
       }
     });
@@ -12738,6 +12763,7 @@ function _handlePartyWsMessage(msg){
           const _zbgm=document.getElementById("zone-bgm");
           if(_zbgm&&!_zbgm.src&&!STATE.inCombat&&!STATE._activityMusicActive){
             _updateZoneMusic(merged.name, merged.id);
+            _updateZoneBackground(merged.id);
           }
         }
       });
@@ -12864,6 +12890,7 @@ function _handlePartyWsMessage(msg){
           const _zbgm=document.getElementById("zone-bgm");
           if(_zbgm&&!_zbgm.src&&!STATE.inCombat&&!STATE._activityMusicActive){
             _updateZoneMusic(merged.name, merged.id);
+            _updateZoneBackground(merged.id);
           }
         }
       });
@@ -13489,9 +13516,11 @@ function _handlePartyWsMessage(msg){
       _dismissArenaConfirm();
       _closeAllUI();
       const _arenaTrack=STATE.zone&&STATE.zone['arenaMusic'+STATE._lastArenaMode];
+      const _arenaBg=STATE.zone&&STATE.zone.arenaBackground;
       _silenceAllMusic();
       showPvPMatchScreen(STATE._pvpOpponentName,()=>{
         STATE._activityMusicActive=_playActivityMusic(_arenaTrack);
+        _playActivityBackground(_arenaBg);
       });
       renderWorldNav();
       break;
@@ -13608,6 +13637,10 @@ function _handlePartyWsMessage(msg){
         if(!STATE._isPvP&&STATE._pendingActivityTrack!==undefined){
           STATE._activityMusicActive=_playActivityMusic(STATE._pendingActivityTrack);
           STATE._pendingActivityTrack=undefined;
+        }
+        if(!STATE._isPvP&&STATE._pendingActivityBackground!==undefined){
+          _playActivityBackground(STATE._pendingActivityBackground);
+          STATE._pendingActivityBackground=undefined;
         }
       });
       if(STATE._isPvP){
@@ -13739,6 +13772,11 @@ function _handlePartyWsMessage(msg){
         const _nextLvlObj=(_szForMusic&&Array.isArray(_szForMusic._levels))?_szForMusic._levels[(msg.nextLevel||1)-1]:null;
         if(_nextLvlObj&&_nextLvlObj.isBoss&&_nextLvlObj.bossMusic){
           STATE._activityMusicActive=_playActivityMusic(_nextLvlObj.bossMusic);
+        }
+        if(_nextLvlObj&&_nextLvlObj.isBoss&&_nextLvlObj.bossBackground){
+          _playActivityBackground(_nextLvlObj.bossBackground);
+        } else if(_szForMusic&&_szForMusic.background){
+          _playActivityBackground(_szForMusic.background);
         }
       }
       addLog("combat_info","Level "+msg.level+" cleared! Advancing to level "+_szLvl+"...");
@@ -14020,6 +14058,7 @@ function _handlePartyWsMessage(msg){
           addLog("ph",`Victory! ${oppName} defeated.`);
           showPvPWinScreen(oppName,()=>{
             _revertActivityMusic();
+            _revertActivityBackground();
             renderWorldNav();updateChatBar();
             _broadcastZone(STATE.zone.id);
             setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);
@@ -14028,6 +14067,7 @@ function _handlePartyWsMessage(msg){
           addLog("ci","Draw. Counted as a loss.");
           showPvPDrawScreen(()=>{
             _revertActivityMusic();
+            _revertActivityBackground();
             renderWorldNav();updateChatBar();
             _broadcastZone(STATE.zone.id);
             setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);
@@ -14037,6 +14077,7 @@ function _handlePartyWsMessage(msg){
           addLog("death","Forfeited the arena fight.");
           showPvPForfeitScreen(()=>{
             _revertActivityMusic();
+            _revertActivityBackground();
             renderWorldNav();updateChatBar();
             _broadcastZone(STATE.zone.id);
             setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);
@@ -14045,6 +14086,7 @@ function _handlePartyWsMessage(msg){
           addLog("death",`Defeated by ${oppName}.`);
           showPvPLoseScreen(oppName,()=>{
             _revertActivityMusic();
+            _revertActivityBackground();
             renderWorldNav();updateChatBar();
             _broadcastZone(STATE.zone.id);
             setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);
@@ -14103,6 +14145,7 @@ function _handlePartyWsMessage(msg){
         endCombatUI();
         showVictoryScreen(_lootLines,()=>{
           _revertActivityMusic();
+          _revertActivityBackground();
           renderWorldNav();updateChatBar();
           _broadcastZone(STATE.zone.id);
           setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);
@@ -14114,7 +14157,7 @@ function _handlePartyWsMessage(msg){
         const respawnZone=ZONES.find(z=>z.id===respawnZoneId)||ZONES[0];
         STATE.zone=respawnZone;
         _silenceAllMusic();
-        STATE._activityMusicActive=false;STATE._pendingActivityTrack=undefined;
+        STATE._activityMusicActive=false;STATE._pendingActivityTrack=undefined;STATE._pendingActivityBackground=undefined;
         STATE.tab="world";
         STATE._hasFled=false;
         updatePlayer(pp=>({...pp,hp:1,energy:0,cooldowns:{},isAlive:true}));
@@ -14125,7 +14168,7 @@ function _handlePartyWsMessage(msg){
         _safeZoneHeal();
         STATE.travelCooldown=60;startCooldownTicker();
         saveGame(true);
-        showBerserkWipeScreen(respawnZone.name,()=>{_updateZoneMusic(respawnZone.name, respawnZone.id);renderWorldNav();updateChatBar();setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);});
+        showBerserkWipeScreen(respawnZone.name,()=>{_updateZoneMusic(respawnZone.name, respawnZone.id);_updateZoneBackground(respawnZone.id);renderWorldNav();updateChatBar();setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);});
         return;
       } else if(msg.outcome==="death"){
         // Determine respawn zone - use leader's zone from server, fallback to player's own setting
@@ -14133,7 +14176,7 @@ function _handlePartyWsMessage(msg){
         const respawnZone=ZONES.find(z=>z.id===respawnZoneId)||ZONES[0];
         STATE.zone=respawnZone;
         _silenceAllMusic();
-        STATE._activityMusicActive=false;STATE._pendingActivityTrack=undefined;
+        STATE._activityMusicActive=false;STATE._pendingActivityTrack=undefined;STATE._pendingActivityBackground=undefined;
         STATE.tab="world";
         const hasFled=STATE._hasFled;
         STATE._hasFled=false;
@@ -14150,6 +14193,7 @@ function _handlePartyWsMessage(msg){
           saveGame(true);
           showEscapeScreen(()=>{
             _updateZoneMusic(respawnZone.name, respawnZone.id);
+            _updateZoneBackground(respawnZone.id);
             renderWorldNav();updateChatBar();
             setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);
           });
@@ -14162,7 +14206,7 @@ function _handlePartyWsMessage(msg){
           _safeZoneHeal();
           STATE.travelCooldown=60;startCooldownTicker();
           saveGame(true);
-          showDeathScreen(()=>{_updateZoneMusic(respawnZone.name, respawnZone.id);renderWorldNav();updateChatBar();setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);});
+          showDeathScreen(()=>{_updateZoneMusic(respawnZone.name, respawnZone.id);_updateZoneBackground(respawnZone.id);renderWorldNav();updateChatBar();setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);});
         }
         return; // skip the shared setTimeout below
       } else if(msg.outcome==="ejected"){
@@ -14171,7 +14215,8 @@ function _handlePartyWsMessage(msg){
         const respawnZone=ZONES.find(z=>z.id===respawnZoneId)||ZONES[0];
         STATE.zone=respawnZone;
         _updateZoneMusic(respawnZone.name, respawnZone.id);
-        STATE._activityMusicActive=false;STATE._pendingActivityTrack=undefined;
+        _updateZoneBackground(respawnZone.id);
+        STATE._activityMusicActive=false;STATE._pendingActivityTrack=undefined;STATE._pendingActivityBackground=undefined;
         STATE.tab="world";
         STATE._hasFled=false;
         updatePlayer(pp=>({...pp,energy:0,cooldowns:{},isAlive:true}));
@@ -14194,7 +14239,7 @@ function _handlePartyWsMessage(msg){
         const fleeRespawnZone=ZONES.find(z=>z.id===fleeRespawnId)||ZONES[0];
         STATE.zone=fleeRespawnZone;
         _silenceAllMusic();
-        STATE._activityMusicActive=false;STATE._pendingActivityTrack=undefined;
+        STATE._activityMusicActive=false;STATE._pendingActivityTrack=undefined;STATE._pendingActivityBackground=undefined;
         STATE.tab="world";
         STATE.player={...STATE.player,lastZone:fleeRespawnZone.id};
         addLog("info","Party escaped from combat.");
@@ -14205,6 +14250,7 @@ function _handlePartyWsMessage(msg){
         saveGame(true);
         showEscapeScreen(()=>{
           _updateZoneMusic(fleeRespawnZone.name, fleeRespawnZone.id);
+          _updateZoneBackground(fleeRespawnZone.id);
           renderWorldNav();updateChatBar();
           setTimeout(()=>{if(STATE._pendingReload&&!STATE.inCombat){STATE._pendingReload=false;_doSmartReload();}},0);
         });
@@ -14648,6 +14694,78 @@ function _silenceAllMusic(){
 }
 
 // ========================================
+//  ZONE / SUBZONE / BOSS / ARENA BACKGROUNDS (image, with video support)
+// ========================================
+// Backgrounds work exactly like the music system above, but drive the
+// game-screen's visual backdrop instead of an audio track. A single field
+// (zone.background, sub.background, level.bossBackground, zone.arenaBackground)
+// holds either an image filename ("Duskwatch.png") or a video filename
+// ("Duskwatch.mp4") uploaded to /background — the extension decides which one
+// gets used, no separate video/image fields needed like the hardcoded login
+// screen. Not developer-configurable per-zone-list here; the live zone/subzone/
+// level data set via the Developer Panel is the single source of truth.
+const _BG_VIDEO_EXT=/\.(mp4|webm|mov|m4v)$/i;
+function _resolveBgSrc(val){
+  if(!val)return null;
+  val=String(val).trim();
+  if(!val)return null;
+  return val.indexOf("background/")===0?val:"background/"+val;
+}
+// Applies a resolved background path to the game screen (or clears it if
+// none given). Video is used automatically when the filename's extension
+// looks like a video; otherwise it's applied as a plain CSS background-image
+// on #game-screen (same cover/center/no-repeat behavior as the login screen).
+function _applyGameBackground(rawVal){
+  const gs=el("game-screen");
+  if(!gs)return;
+  const vid=el("zone-bg-video");
+  const src=_resolveBgSrc(rawVal);
+  if(!src){
+    gs.style.backgroundImage="";
+    if(vid){vid.pause();vid.removeAttribute("src");vid.style.display="none";}
+    return;
+  }
+  if(_BG_VIDEO_EXT.test(src)){
+    gs.style.backgroundImage="";
+    if(vid){
+      vid.disablePictureInPicture=true;
+      vid.onerror=()=>{vid.style.display="none";};
+      if(vid.getAttribute("src")!==src)vid.src=src;
+      vid.style.display="block";
+      const _p=vid.play();
+      if(_p&&_p.catch)_p.catch(()=>{});
+    }
+  } else {
+    if(vid){vid.pause();vid.removeAttribute("src");vid.style.display="none";}
+    gs.style.backgroundImage=`url("${src}")`;
+  }
+}
+// Sets the game screen's background from the destination zone's own
+// `background` field (or clears it if the zone has none set). Called
+// wherever _updateZoneMusic is called, so background and music always
+// switch together on travel/respawn.
+function _updateZoneBackground(zoneId){
+  const zoneObj=zoneId?ZONES.find(z=>z.id===zoneId):null;
+  _applyGameBackground(zoneObj&&zoneObj.background);
+}
+// Plays a one-off activity background (a Dungeon/Raid/Trial/Fishing subzone,
+// a boss level, or an Arena mode) if one is configured. Mirrors
+// _playActivityMusic: does nothing if no background is set for that
+// activity, leaving whatever backdrop is already showing (normally the
+// zone's own background) alone. Returns true if it actually switched.
+function _playActivityBackground(rawBg){
+  if(!rawBg)return false;
+  _applyGameBackground(rawBg);
+  return true;
+}
+// Call when an activity (Explore/subzone/Arena/boss level) ends and the
+// player is still in the same zone - restores the zone's own background.
+// Safe to call unconditionally, same as _revertActivityMusic.
+function _revertActivityBackground(){
+  if(STATE.zone)_updateZoneBackground(STATE.zone.id);
+}
+
+// ========================================
 //  RESUME MUSIC AFTER AN INVOLUNTARY PAUSE
 // ========================================
 // Browsers (especially mobile) frequently pause background <audio>/<video>
@@ -14737,7 +14855,7 @@ function showTravelScreen(zoneName, isSafe, onDone, zoneId){
   const particleEl = document.getElementById("tr-particles");
   const barWrap    = document.getElementById("tr-bar-wrap");
   const barFill    = document.getElementById("tr-bar-fill");
-  if(!overlay){ _updateZoneMusic(zoneName, zoneId); onDone(); return; }
+  if(!overlay){ _updateZoneMusic(zoneName, zoneId); _updateZoneBackground(zoneId); onDone(); return; }
   const accentColor = isSafe ? "#44ee44" : "#ff4444";
   const glowAnim    = isSafe ? "tr-glow-safe" : "tr-glow-danger";
   const typeLabel   = isSafe ? "SAFE ZONE" : "DANGER ZONE";
@@ -14824,6 +14942,7 @@ function showTravelScreen(zoneName, isSafe, onDone, zoneId){
         if(particleEl) particleEl.innerHTML="";
         _travelDestName=null;
         _updateZoneMusic(zoneName, zoneId);
+        _updateZoneBackground(zoneId);
         onDone();
       }, 500);
     }, 5000);
@@ -15077,7 +15196,7 @@ function renderWorldTab(content){
       fBtn.className="world-btn";
       fBtn.innerHTML=`<span style="pointer-events:none;-webkit-user-select:none;user-select:none;">${fcd>0?'Fishing ('+(fcd)+'s)':'Fishing'}</span>`;
       fBtn.disabled=(fcd>0);
-      fBtn.onclick=()=>openFishingMinigame(sz.name||null, sz.music||null);
+      fBtn.onclick=()=>openFishingMinigame(sz.name||null, sz.music||null, sz.background||null);
       body.appendChild(fBtn);
     } else if(z.hasFishing){
       // Legacy fallback: zone has hasFishing flag but no subzones array yet
@@ -15583,6 +15702,7 @@ async function _doExploreStart(z){
   STATE.exploreCooldown=10;
   startCooldownTicker();
   STATE._pendingActivityTrack=z.exploreMusic;
+  STATE._pendingActivityBackground=undefined;
   _silenceAllMusic();
   // If in party, signal members to enter combat
   if(_inParty()&&_isPartyLeader()){
@@ -15617,6 +15737,14 @@ function _enterSubzone(sz, szType, szName){
       STATE._activityMusicActive=_playActivityMusic(_firstLvl.bossMusic);
     } else {
       STATE._pendingActivityTrack=sz.music;
+    }
+    if(_firstLvl&&_firstLvl.isBoss&&_firstLvl.bossBackground){
+      // Same idea as the boss music above — show the boss's own background
+      // immediately rather than waiting for combat_start.
+      STATE._pendingActivityBackground=undefined;
+      _playActivityBackground(_firstLvl.bossBackground);
+    } else {
+      STATE._pendingActivityBackground=sz.background;
     }
     _showSubzoneCombatTransition(szName, szType);
     // Build member uid list
@@ -15708,10 +15836,11 @@ const RARITY_ORDER={common:0,uncommon:1,rare:2,epic:3,legendary:4,mythic:5};
 // Active fishing subzone name — set when player taps a subzone fishing button, cleared on close
 let _activeFishingSubzoneName = null;
 
-function openFishingMinigame(subzoneName, track){
+function openFishingMinigame(subzoneName, track, bg){
   if(STATE.fishCooldown>0||STATE.inCombat)return;
   _activeFishingSubzoneName = subzoneName || null;
   STATE._activityMusicActive=_playActivityMusic(track);
+  _playActivityBackground(bg);
   if(_fishState)_cancelFishRAF();
   const overlay=el("fishing-overlay");
   if(!overlay)return;
@@ -15734,6 +15863,7 @@ function _cancelFishRAF(){
 function _closeFishing(caught,fishId){
   if(!_fishState&&!document.getElementById("fish-caught-panel")&&!document.querySelector("#fishing-overlay.show"))return;
   _revertActivityMusic();
+  _revertActivityBackground();
   _cancelFishRAF();
   if(_partyWs&&_partyWs.readyState===1){
     _partyWs.send(JSON.stringify({type:"fish_cancel"}));
@@ -17179,9 +17309,16 @@ function _applyPartyDoc(d){
       }else{
         STATE._pendingActivityTrack=_szObj&&_szObj.music;
       }
+      if(_szFirstLvl&&_szFirstLvl.isBoss&&_szFirstLvl.bossBackground){
+        STATE._pendingActivityBackground=undefined;
+        _playActivityBackground(_szFirstLvl.bossBackground);
+      }else{
+        STATE._pendingActivityBackground=_szObj&&_szObj.background;
+      }
       _showSubzoneCombatTransition(d.combatSignal.szName||d.combatSignal.szType,d.combatSignal.szType);
     }else{
       STATE._pendingActivityTrack=STATE.zone&&STATE.zone.exploreMusic;
+      STATE._pendingActivityBackground=undefined;
       _silenceAllMusic();
       showCombatTransition();
     }
