@@ -2271,12 +2271,13 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   }
   function _forceFullscreen(){
     var _dlOv=document.getElementById("devlog-overlay");
-    if(_dlOv&&_dlOv.style.display!=="none")return;
-    if(document.fullscreenElement||document.webkitFullscreenElement){_lockPortrait();return;}
-    if(window.matchMedia("(display-mode: standalone)").matches){_lockPortrait();return;}
+    if(_dlOv&&_dlOv.style.display!=="none")return false;
+    if(document.fullscreenElement||document.webkitFullscreenElement){_lockPortrait();return false;}
+    if(window.matchMedia("(display-mode: standalone)").matches){_lockPortrait();return false;}
     var el=document.documentElement;
-    if(el.requestFullscreen)el.requestFullscreen({navigationUI:"hide"}).then(_lockPortrait).catch(function(){});
-    else if(el.webkitRequestFullscreen)el.webkitRequestFullscreen();
+    if(el.requestFullscreen){el.requestFullscreen({navigationUI:"hide"}).then(_lockPortrait).catch(function(){});return true;}
+    else if(el.webkitRequestFullscreen){el.webkitRequestFullscreen();return true;}
+    return false;
   }
   window._forceFullscreen=_forceFullscreen;
 
@@ -2309,9 +2310,8 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   var _fsLastAttempt=0;
   document.addEventListener("pointerdown",function(){
     if(!_isFsActive()){
-      _fsLastAttempt=Date.now();
       try{if(!document.hasFocus())window.focus();}catch(e){}
-      _forceFullscreen();
+      if(_forceFullscreen())_fsLastAttempt=Date.now();
     }
   },true);
   document.addEventListener("click",function(){
