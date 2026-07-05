@@ -11149,9 +11149,15 @@ function showDeathScreen(onDone, onMid){
   setTimeout(()=>{ if(onMid)onMid(); },2500);
   // Fade out at 5.5s total (5s visible + 0.5s fade)
   setTimeout(()=>{
-    if(scanline) scanline.style.display="none";
-    overlay.style.transition="opacity 0.5s ease"; overlay.style.opacity="0";
-    setTimeout(()=>{overlay.style.pointerEvents="none"; onDone();},500);
+    // Guarantee the destination background actually finished loading before we
+    // reveal it — never fade away onto a still-blank background underneath.
+    // _bgReadyPromise always resolves on its own (it has a built-in safety
+    // timeout), so this can never hang the screen open indefinitely.
+    Promise.resolve(_bgReadyPromise).then(()=>{
+      if(scanline) scanline.style.display="none";
+      overlay.style.transition="opacity 0.5s ease"; overlay.style.opacity="0";
+      setTimeout(()=>{overlay.style.pointerEvents="none"; onDone();},500);
+    });
   },5000);
 }
 function showBerserkWipeScreen(respawnName, onDone, onMid){
@@ -11191,8 +11197,10 @@ function showBerserkWipeScreen(respawnName, onDone, onMid){
   // Midpoint of the hold - background can load unseen behind the overlay here
   setTimeout(()=>{ if(onMid)onMid(); },2500);
   setTimeout(()=>{
-    overlay.style.transition="opacity 0.5s ease";overlay.style.opacity="0";
-    setTimeout(()=>{overlay.style.pointerEvents="none";if(onDone)onDone();},500);
+    Promise.resolve(_bgReadyPromise).then(()=>{
+      overlay.style.transition="opacity 0.5s ease";overlay.style.opacity="0";
+      setTimeout(()=>{overlay.style.pointerEvents="none";if(onDone)onDone();},500);
+    });
   },5000);
 }
 function showVictoryScreen(lootLines,onDone,onMid){
@@ -11253,9 +11261,11 @@ function showVictoryScreen(lootLines,onDone,onMid){
   setTimeout(()=>{ if(onMid)onMid(); },2500);
   // Fade out at 5.5s total
   setTimeout(()=>{
-    overlay.style.transition="opacity 0.5s ease";
-    overlay.style.opacity="0";
-    setTimeout(()=>{overlay.style.pointerEvents="none";onDone();},500);
+    Promise.resolve(_bgReadyPromise).then(()=>{
+      overlay.style.transition="opacity 0.5s ease";
+      overlay.style.opacity="0";
+      setTimeout(()=>{overlay.style.pointerEvents="none";onDone();},500);
+    });
   },5000);
 }
 function showEscapeScreen(onDone, onMid){
@@ -11281,8 +11291,10 @@ function showEscapeScreen(onDone, onMid){
   // Midpoint of the hold - background can load unseen behind the overlay here
   setTimeout(()=>{ if(onMid)onMid(); },2500);
   setTimeout(()=>{
-    overlay.style.transition="opacity 0.5s ease";overlay.style.opacity="0";
-    setTimeout(()=>{overlay.style.pointerEvents="none";onDone();},500);
+    Promise.resolve(_bgReadyPromise).then(()=>{
+      overlay.style.transition="opacity 0.5s ease";overlay.style.opacity="0";
+      setTimeout(()=>{overlay.style.pointerEvents="none";onDone();},500);
+    });
   },5000);
 }
 
@@ -11311,8 +11323,10 @@ function _showPvPOverlay(id, onDone, duration=5000, onMid){
   // Midpoint of the hold - background can load unseen behind the overlay here
   setTimeout(()=>{ if(onMid)onMid(); },duration/2);
   setTimeout(()=>{
-    overlay.style.transition="opacity 0.5s ease";overlay.style.opacity="0";
-    setTimeout(()=>{overlay.style.pointerEvents="none";if(onDone)onDone();},500);
+    Promise.resolve(_bgReadyPromise).then(()=>{
+      overlay.style.transition="opacity 0.5s ease";overlay.style.opacity="0";
+      setTimeout(()=>{overlay.style.pointerEvents="none";if(onDone)onDone();},500);
+    });
   },duration);
 }
 function showPvPMatchScreen(opponentName, onDone, onMid){
@@ -14914,9 +14928,20 @@ function _resolveBgSrc(val){
 // none given). Video is used automatically when the filename's extension
 // looks like a video; otherwise it's applied as a plain CSS background-image
 // on #game-screen (same cover/center/no-repeat behavior as the login screen).
+//
+// Also tracks _bgReadyPromise: a global promise that resolves once THIS call's
+// background has actually finished loading (image decoded / video has a
+// renderable frame) — not just once the fetch was kicked off. Every
+// transition-screen "fade the overlay away now" moment awaits this before
+// actually starting the fade, so the destination background is guaranteed to
+// already be in place underneath, instead of trusting a fixed timer alone to
+// have been enough time on a slow connection or an uncached asset. It always
+// resolves within ~4s even if the asset never loads/errors, so a bad/missing
+// file can never leave a transition stuck on screen forever.
+let _bgReadyPromise=Promise.resolve();
 function _applyGameBackground(rawVal){
   const gs=el("game-screen");
-  if(!gs)return;
+  if(!gs){ _bgReadyPromise=Promise.resolve(); return _bgReadyPromise; }
   const vid=el("zone-bg-video");
   const src=_resolveBgSrc(rawVal);
   const _hud=el("_bg_debug_hud");
@@ -14924,24 +14949,56 @@ function _applyGameBackground(rawVal){
     gs.style.backgroundImage="";
     if(vid){vid.pause();vid.removeAttribute("src");vid.style.display="none";}
     if(_hud)_hud.textContent="bg-debug: raw="+JSON.stringify(rawVal)+" -> NO SOURCE (field empty/undefined) | zone="+(STATE.zone&&STATE.zone.id);
-    return;
+    _bgReadyPromise=Promise.resolve();
+    return _bgReadyPromise;
   }
+  const _safetyTimeout=()=>new Promise(res=>setTimeout(res,4000));
   if(_BG_VIDEO_EXT.test(src)){
     gs.style.backgroundImage="";
     if(vid){
       vid.disablePictureInPicture=true;
       vid.onerror=()=>{vid.style.display="none";if(_hud)_hud.textContent+=" | VIDEO ERROR (bad file/path)";};
-      if(vid.getAttribute("src")!==src)vid.src=src;
+      let readyP;
+      if(vid.getAttribute("src")!==src){
+        readyP=new Promise(res=>{
+          vid.addEventListener("loadeddata",res,{once:true});
+          vid.addEventListener("error",res,{once:true});
+        });
+        vid.src=src;
+      } else {
+        // Same src already applied - a frame may already be decoded (readyState
+        // HAVE_CURRENT_DATA or better) from a previous load, in which case
+        // there's nothing left to wait for.
+        readyP=vid.readyState>=2?Promise.resolve():new Promise(res=>{
+          vid.addEventListener("loadeddata",res,{once:true});
+          vid.addEventListener("error",res,{once:true});
+        });
+      }
       vid.style.display="block";
       const _p=vid.play();
       if(_p&&_p.catch)_p.catch(()=>{});
+      _bgReadyPromise=Promise.race([readyP,_safetyTimeout()]);
+    } else {
+      _bgReadyPromise=Promise.resolve();
     }
     if(_hud)_hud.textContent="bg-debug: raw="+JSON.stringify(rawVal)+" -> VIDEO src="+src+" | zone="+(STATE.zone&&STATE.zone.id);
   } else {
     if(vid){vid.pause();vid.removeAttribute("src");vid.style.display="none";}
-    gs.style.backgroundImage=`url("${src}")`;
+    // Preload+decode before flipping the CSS property: setting background-image
+    // alone doesn't guarantee the browser has actually fetched/decoded the
+    // file yet, which is exactly what could leave a transition screen fading
+    // out onto a still-blank background on a slow connection or a first-time
+    // (uncached) load. The old background stays visible underneath the overlay
+    // until the new one is confirmed ready, then they're swapped in one step.
+    const img=new Image();
+    img.src=src;
+    const decodeP=img.decode?img.decode().catch(()=>{}):new Promise(res=>{img.onload=res;img.onerror=res;});
+    _bgReadyPromise=Promise.race([decodeP,_safetyTimeout()]).then(()=>{
+      gs.style.backgroundImage=`url("${src}")`;
+    });
     if(_hud)_hud.textContent="bg-debug: raw="+JSON.stringify(rawVal)+" -> IMAGE src="+src+" | zone="+(STATE.zone&&STATE.zone.id);
   }
+  return _bgReadyPromise;
 }
 // Sets the game screen's background from the destination zone's own
 // `background` field (or clears it if the zone has none set). Called
@@ -14949,7 +15006,7 @@ function _applyGameBackground(rawVal){
 // switch together on travel/respawn.
 function _updateZoneBackground(zoneId){
   const zoneObj=zoneId?ZONES.find(z=>z.id===zoneId):null;
-  _applyGameBackground(zoneObj&&zoneObj.background);
+  return _applyGameBackground(zoneObj&&zoneObj.background);
 }
 // Plays a one-off activity background (a Dungeon/Raid/Trial/Fishing subzone,
 // a boss level, or an Arena mode) if one is configured. Mirrors
@@ -15146,19 +15203,27 @@ function showTravelScreen(zoneName, isSafe, onDone, zoneId){
     _trFadeTimer=setTimeout(()=>{
       if(gen !== _travelCallGen){ _trFadeTimer=null; return; }
       _trFadeTimer=null;
-      if(_trParticleTimer){ clearInterval(_trParticleTimer); _trParticleTimer=null; }
-      overlay.style.transition="opacity 0.5s ease";
-      overlay.style.opacity="0";
-      _trInnerTimer=setTimeout(()=>{
-        _trInnerTimer=null;
-        if(gen !== _travelCallGen) return; // stale - do NOT hide overlay or fire onDone
-        overlay.style.pointerEvents="none";
-        overlay.style.display="none";
-        if(particleEl) particleEl.innerHTML="";
-        _travelDestName=null;
-        _updateZoneMusic(zoneName, zoneId);
-        onDone();
-      }, 500);
+      // Guarantee the destination background actually finished loading before
+      // the overlay starts fading away — never reveal a still-blank background
+      // underneath on a slow connection or an uncached asset. _bgReadyPromise
+      // always resolves on its own via a built-in safety timeout, so this can
+      // never leave the transition stuck on screen indefinitely.
+      Promise.resolve(_bgReadyPromise).then(()=>{
+        if(gen !== _travelCallGen) return;
+        if(_trParticleTimer){ clearInterval(_trParticleTimer); _trParticleTimer=null; }
+        overlay.style.transition="opacity 0.5s ease";
+        overlay.style.opacity="0";
+        _trInnerTimer=setTimeout(()=>{
+          _trInnerTimer=null;
+          if(gen !== _travelCallGen) return; // stale - do NOT hide overlay or fire onDone
+          overlay.style.pointerEvents="none";
+          overlay.style.display="none";
+          if(particleEl) particleEl.innerHTML="";
+          _travelDestName=null;
+          _updateZoneMusic(zoneName, zoneId);
+          onDone();
+        }, 500);
+      });
     }, 5000);
   }));
 }
@@ -15251,10 +15316,16 @@ function _dismissCombatTransition(onDone){
     setTimeout(()=>_dismissCombatTransition(onDone),minDisplay-elapsed);
     return;
   }
-  const particleEl=el("ce-particles");
-  overlay.style.transition="opacity 0.5s ease";
-  overlay.style.opacity="0";
-  setTimeout(()=>{overlay.style.pointerEvents="none";overlay.style.display="none";if(particleEl)particleEl.innerHTML="";if(onDone)onDone();},500);
+  // Guarantee any boss/subzone background swap triggered for this transition
+  // (see subzone_level_complete handling above) actually finished loading
+  // before we reveal it. _bgReadyPromise always resolves on its own via a
+  // built-in safety timeout, so this can never hang the transition open.
+  Promise.resolve(_bgReadyPromise).then(()=>{
+    const particleEl=el("ce-particles");
+    overlay.style.transition="opacity 0.5s ease";
+    overlay.style.opacity="0";
+    setTimeout(()=>{overlay.style.pointerEvents="none";overlay.style.display="none";if(particleEl)particleEl.innerHTML="";if(onDone)onDone();},500);
+  });
 }
 function renderWorldNav(){
   // Never show world-nav while in combat - startCombat hides it, endCombatUI restores it
