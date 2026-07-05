@@ -21465,10 +21465,13 @@ window.addEventListener("pageshow",function(e){
 // ── visibilitychange: snap reconnect screen immediately when tab comes back ───
 document.addEventListener("visibilitychange",function(){
   if(document.visibilityState==="visible"){
-    // Re-enter fullscreen right away on tab-back. Browsers may reject this since it's
-    // not a user gesture, so the existing tap/click/key listeners (_forceFullscreen)
-    // remain as the guaranteed fallback if this attempt is silently blocked.
-    if(window._forceFullscreen)window._forceFullscreen();
+    // Deliberately NOT calling _forceFullscreen() here: requestFullscreen() without a
+    // real user gesture is guaranteed to be rejected, and on some browsers (notably
+    // Android Chrome) that rejected attempt leaves the Fullscreen API in a state where
+    // the very next real tap's request also gets rejected - forcing an extra throwaway
+    // tap to recover. The "tap to continue" overlay (fs-resume-overlay) is the intended
+    // recovery path now: it's shown by _updateFsResumeOverlay whenever not fullscreen,
+    // and the first real tap on it enters fullscreen cleanly.
     // If WS is down and 2s threshold has passed, show reconnect screen now
     if((!_partyWs||_partyWs.readyState!==1)&&STATE&&STATE.player&&STATE.player.name){
       if(window._rcDelayTimer){
