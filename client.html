@@ -2281,13 +2281,20 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   window._forceFullscreen=_forceFullscreen;
 
   // ── "Tap to continue" overlay: shown any time we're not in fullscreen ────
+  // NOTE: this is a *resume* prompt (tab-back, bfcache exit, etc.), not part of the
+  // initial Launch flow. On first entry, the auto-fullscreen tap-catcher (see the
+  // separate script near the top of <body>) handles getting into fullscreen silently,
+  // carrying over the Launch button's activation with no visible overlay. So this
+  // overlay stays suppressed until fullscreen has actually been achieved at least once;
+  // only after that first success does dropping out of fullscreen trigger the prompt.
+  var _fsEverActivated=false;
   var _frOv=null;
   function _updateFsResumeOverlay(){
     if(!_frOv)_frOv=document.getElementById("fs-resume-overlay");
     if(!_frOv)return;
     var _dlOv=document.getElementById("devlog-overlay");
     if(_dlOv&&_dlOv.style.display!=="none"){_frOv.classList.remove("show");return;}
-    if(_isFsActive())_frOv.classList.remove("show");
+    if(!_fsEverActivated||_isFsActive())_frOv.classList.remove("show");
     else _frOv.classList.add("show");
   }
   window._updateFsResumeOverlay=_updateFsResumeOverlay;
@@ -2313,10 +2320,11 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   });
   document.addEventListener("keydown",_forceFullscreen);
   document.addEventListener("fullscreenchange",function(){
-    if(document.fullscreenElement)_lockPortrait();
+    if(document.fullscreenElement){_lockPortrait();_fsEverActivated=true;}
     _updateFsResumeOverlay();
   });
   document.addEventListener("webkitfullscreenchange",function(){
+    if(document.webkitFullscreenElement)_fsEverActivated=true;
     _lockPortrait();
     _updateFsResumeOverlay();
   });
