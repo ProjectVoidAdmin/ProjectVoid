@@ -1299,51 +1299,6 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   -webkit-tap-highlight-color:transparent;
 }
 </style>
-<script>
-// ── TEMP DIAGNOSTIC — remove after debugging ──────────────────────────────
-(function(){
-  function requestFs(){
-    var el = document.documentElement;
-    var req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
-    if(!req) return Promise.reject(new Error("requestFullscreen not supported"));
-    try{ var r = req.call(el); return r ? r : Promise.resolve("called (no promise returned - older API)"); }
-    catch(e){ return Promise.reject(e); }
-  }
-  function report(){
-    var dm = "unknown";
-    ["fullscreen","standalone","minimal-ui","browser"].forEach(function(m){
-      if(window.matchMedia("(display-mode: "+m+")").matches) dm = m;
-    });
-    var fs = !!(document.fullscreenElement||document.webkitFullscreenElement);
-    var box = document.createElement("div");
-    box.style.cssText="position:fixed;top:0;left:0;right:0;z-index:9999999;background:rgba(255,0,0,0.9);color:#fff;font:11px monospace;padding:6px;white-space:pre-wrap;";
-    var resultLine = document.createElement("div");
-    resultLine.textContent = "tap button below to test requestFullscreen()";
-    var btn = document.createElement("button");
-    btn.textContent = "TRY FULLSCREEN NOW";
-    btn.style.cssText = "display:block;margin-top:6px;padding:8px 12px;font:12px monospace;background:#fff;color:#000;border:none;";
-    btn.addEventListener("click", function(){
-      requestFs().then(function(msg){
-        resultLine.textContent = "SUCCESS: " + (typeof msg === "string" ? msg : "entered fullscreen") + " | fullscreenEnabled=" + document.fullscreenEnabled;
-      }).catch(function(e){
-        resultLine.textContent = "REJECTED: " + (e && e.message ? e.message : e) + " | name=" + (e && e.name) + " | fullscreenEnabled=" + document.fullscreenEnabled;
-      });
-    });
-    box.textContent =
-      "display-mode: "+dm+"\n"+
-      "fullscreenElement active: "+fs+"\n"+
-      "document.fullscreenEnabled: "+document.fullscreenEnabled+"\n"+
-      "innerH/W: "+window.innerHeight+"x"+window.innerWidth+"\n"+
-      "screen availH: "+screen.availHeight+" / screen H: "+screen.height+"\n"+
-      "UA: "+navigator.userAgent+"\n";
-    box.appendChild(btn);
-    box.appendChild(resultLine);
-    document.body.appendChild(box);
-  }
-  if(document.readyState==="complete") report();
-  else window.addEventListener("load",report);
-})();
-</script>
 </head>
 <body>
 <script>
@@ -2320,22 +2275,30 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
     }catch(e){}
   }
   window._lockPortrait=_lockPortrait;
-  function _isInstalledDisplayMode(){
-    // An installed PWA can launch in either display mode depending on platform/manifest;
-    // both mean there's no browser chrome and no Fullscreen-API-driven state to check.
-    return window.matchMedia("(display-mode: standalone)").matches||window.matchMedia("(display-mode: fullscreen)").matches;
+  function _isInstalledFullscreenMode(){
+    // True immersive display mode: no system UI at all (status bar included).
+    // Only some platforms actually honor manifest display:"fullscreen" as this mode.
+    return window.matchMedia("(display-mode: fullscreen)").matches;
+  }
+  function _isInstalledStandaloneMode(){
+    // Standalone removes browser chrome (URL bar) but Android still shows the
+    // system status bar here - it is NOT the same as true fullscreen, so we
+    // must still drive the Fullscreen API ourselves to hide the status bar.
+    return window.matchMedia("(display-mode: standalone)").matches;
   }
   function _isFsActive(){
-    return !!(document.fullscreenElement||document.webkitFullscreenElement)||_isInstalledDisplayMode();
+    return !!(document.fullscreenElement||document.webkitFullscreenElement)||_isInstalledFullscreenMode();
   }
   function _forceFullscreen(){
     var _dlOv=document.getElementById("devlog-overlay");
     if(_dlOv&&_dlOv.style.display!=="none")return false;
     if(document.fullscreenElement||document.webkitFullscreenElement){_lockPortrait();return false;}
-    if(_isInstalledDisplayMode()){_lockPortrait();return false;}
+    if(_isInstalledFullscreenMode()){_lockPortrait();return false;}
     var el=document.documentElement;
     if(el.requestFullscreen){el.requestFullscreen({navigationUI:"hide"}).then(_lockPortrait).catch(function(){});return true;}
     else if(el.webkitRequestFullscreen){el.webkitRequestFullscreen();return true;}
+    // No Fullscreen API available (rare in standalone) - at least lock orientation.
+    if(_isInstalledStandaloneMode())_lockPortrait();
     return false;
   }
   window._forceFullscreen=_forceFullscreen;
