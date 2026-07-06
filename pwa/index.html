@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="theme-color" content="#000000"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="icon" href="icon-192.png"/>
+<title>Project Void</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100dvh;background:#000;overflow:hidden;font-family:'Courier New',monospace;color:#fff;}
+iframe{width:100%;height:100dvh;border:0;display:block;background:#000;}
+
+/* ── Install instructions screen ───────────────────────────────── */
+#installScreen{
+  display:none;height:100dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:32px 20px 40px;
+}
+#installScreen.show{display:block;}
+.install-icon{
+  display:block;margin:0 auto 18px;width:88px;height:88px;border-radius:20px;
+}
+.install-title{text-align:center;font-size:22px;letter-spacing:4px;margin-bottom:4px;}
+.install-sub{text-align:center;font-size:11px;letter-spacing:2px;color:#666;margin-bottom:28px;}
+.tabs{display:flex;gap:6px;max-width:440px;margin:0 auto 22px;flex-wrap:wrap;justify-content:center;}
+.tab-btn{
+  background:#0a0a0a;color:#888;border:1px solid #333;border-radius:6px;
+  padding:8px 14px;font-family:'Courier New',monospace;font-size:12px;letter-spacing:1px;
+  cursor:pointer;
+}
+.tab-btn.active{background:#fff;color:#000;border-color:#fff;}
+.panel{display:none;max-width:440px;margin:0 auto;}
+.panel.active{display:block;}
+.panel ol{padding-left:20px;line-height:1.9;font-size:14px;}
+.panel li{margin-bottom:10px;}
+.panel .note{
+  margin-top:16px;font-size:11px;color:#777;letter-spacing:0.5px;
+  border-top:1px solid #222;padding-top:14px;line-height:1.6;
+}
+#installNowBtn{
+  display:none;width:100%;max-width:440px;margin:0 auto 22px;background:#fff;color:#000;
+  border:none;border-radius:6px;padding:13px;font-family:'Courier New',monospace;
+  font-size:14px;letter-spacing:2px;cursor:pointer;font-weight:bold;
+}
+
+/* ── Already-installed screen ──────────────────────────────────── */
+#alreadyScreen{
+  display:none;height:100dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:32px 20px 40px;align-items:center;justify-content:center;flex-direction:column;
+}
+#alreadyScreen.show{display:flex;}
+.already-body{max-width:400px;text-align:center;}
+.already-body .install-icon{margin-bottom:22px;}
+.already-msg{font-size:14px;line-height:1.9;color:#ccc;}
+.already-msg strong{color:#fff;}
+</style>
+<script>
+if("serviceWorker" in navigator){
+  window.addEventListener("load",function(){
+    navigator.serviceWorker.register("sw.js").catch(function(){});
+  });
+}
+</script>
+</head>
+<body>
+
+<div id="installScreen">
+  <img class="install-icon" src="icon-192.png" alt=""/>
+  <div class="install-title">PROJECT VOID</div>
+  <div class="install-sub">INSTALL FOR THE BEST EXPERIENCE</div>
+
+  <button id="installNowBtn">INSTALL NOW</button>
+
+  <div class="tabs">
+    <button class="tab-btn" data-panel="android">ANDROID</button>
+    <button class="tab-btn" data-panel="ios">IPHONE / IPAD</button>
+    <button class="tab-btn" data-panel="pc">WINDOWS PC</button>
+    <button class="tab-btn" data-panel="mac">MAC</button>
+  </div>
+
+  <div class="panel" data-panel="android">
+    <ol>
+      <li>Open this page in <strong>Chrome</strong>.</li>
+      <li>Tap the <strong>⋮</strong> menu icon in the top-right corner.</li>
+      <li>Tap <strong>"Add to Home screen"</strong> or <strong>"Install app"</strong>.</li>
+      <li>Tap <strong>"Install"</strong> to confirm.</li>
+      <li>Open <strong>Project Void</strong> from your home screen icon.</li>
+    </ol>
+    <div class="note">If a bar appears at the bottom of the screen offering to install the app, you can tap that instead.</div>
+  </div>
+
+  <div class="panel" data-panel="ios">
+    <ol>
+      <li>Open this page in <strong>Safari</strong> (this must be done in Safari, not Chrome).</li>
+      <li>Tap the <strong>Share</strong> icon (square with an arrow pointing up) in the toolbar.</li>
+      <li>Scroll down and tap <strong>"Add to Home Screen"</strong>.</li>
+      <li>Tap <strong>"Add"</strong> in the top-right corner.</li>
+      <li>Open <strong>Project Void</strong> from your home screen icon.</li>
+    </ol>
+    <div class="note">iOS only allows installing web apps through Safari - it won't work from Chrome or other browsers on iPhone/iPad.</div>
+  </div>
+
+  <div class="panel" data-panel="pc">
+    <ol>
+      <li>Open this page in <strong>Chrome</strong> or <strong>Edge</strong>.</li>
+      <li>Look for the <strong>install icon</strong> (a small monitor with a down arrow) on the right side of the address bar.</li>
+      <li>Click it, then click <strong>"Install"</strong>.</li>
+      <li>Open <strong>Project Void</strong> from your Start menu or desktop shortcut.</li>
+    </ol>
+    <div class="note">Don't see the icon? Click the ⋮ menu instead and look for "Install Project Void...".</div>
+  </div>
+
+  <div class="panel" data-panel="mac">
+    <ol>
+      <li><strong>Safari:</strong> open this page, then use the <strong>File</strong> menu → <strong>"Add to Dock"</strong>.</li>
+      <li><strong>Chrome:</strong> open this page, click the <strong>install icon</strong> in the address bar, then click <strong>"Install"</strong>.</li>
+      <li>Open <strong>Project Void</strong> from your Dock or Applications folder.</li>
+    </ol>
+    <div class="note">"Add to Dock" requires Safari 17 or later. Older versions can use Chrome instead.</div>
+  </div>
+
+</div>
+
+<div id="alreadyScreen">
+  <div class="already-body">
+    <img class="install-icon" src="icon-192.png" alt=""/>
+    <div class="install-title">PROJECT VOID</div>
+    <div class="install-sub">ALREADY INSTALLED</div>
+    <div class="already-msg">
+      Looks like <strong>Project Void</strong> is already installed on this device.<br/><br/>
+      Please open it from your <strong>home screen</strong> or <strong>app list</strong> instead of this browser tab.
+    </div>
+  </div>
+</div>
+
+<iframe id="viewFrame" src="https://projectvoidadmin.github.io/ProjectVoid/" allow="autoplay; fullscreen; clipboard-write" allowfullscreen style="display:none;"></iframe>
+
+<script>
+(function(){
+  var GAME_URL = "https://projectvoidadmin.github.io/ProjectVoid/";
+  var installScreen = document.getElementById("installScreen");
+  var alreadyScreen = document.getElementById("alreadyScreen");
+  var frame = document.getElementById("viewFrame");
+  var installNowBtn = document.getElementById("installNowBtn");
+
+  function isStandalone(){
+    return window.matchMedia("(display-mode: standalone)").matches ||
+           window.matchMedia("(display-mode: fullscreen)").matches ||
+           window.navigator.standalone === true; // legacy iOS Safari flag
+  }
+
+  function showGame(){
+    installScreen.classList.remove("show");
+    alreadyScreen.classList.remove("show");
+    frame.style.display = "block";
+  }
+
+  function showInstallScreen(){
+    frame.style.display = "none";
+    alreadyScreen.classList.remove("show");
+    installScreen.classList.add("show");
+  }
+
+  function showAlreadyInstalled(){
+    frame.style.display = "none";
+    installScreen.classList.remove("show");
+    alreadyScreen.classList.add("show");
+  }
+
+  // Only ever load the actual game when genuinely running as the installed,
+  // standalone app. Every other case (regular browser tab, whether or not
+  // it happens to already be installed elsewhere) stops at an informational
+  // screen - never the game itself.
+  //
+  // Detecting "already installed, but you're looking at this in a browser
+  // tab right now" has no fully reliable cross-browser signal, so this
+  // layers three checks from strongest to weakest:
+  //   1) A flag this page already set itself last time it confirmed install
+  //      (via the appinstalled event, or a previous getInstalledRelatedApps
+  //      check below) - instant, no async needed.
+  //   2) navigator.getInstalledRelatedApps() - a real Chromium API for this
+  //      exact purpose, but only on Chrome/Edge (Android + desktop). Not
+  //      available on iOS Safari or Firefox at all.
+  //   3) If neither applies, fall back to the install instructions - which
+  //      is also the correct screen for a genuinely-not-installed visitor.
+  function route(){
+    if(isStandalone()){ showGame(); return; }
+
+    if(localStorage.getItem("pv_installed") === "true"){ showAlreadyInstalled(); return; }
+
+    if(navigator.getInstalledRelatedApps){
+      navigator.getInstalledRelatedApps().then(function(apps){
+        if(isStandalone()){ showGame(); return; } // re-check - state may have changed while awaiting
+        if(apps && apps.length){
+          localStorage.setItem("pv_installed", "true");
+          showAlreadyInstalled();
+        }else{
+          showInstallScreen();
+        }
+      }).catch(function(){ showInstallScreen(); });
+      return;
+    }
+
+    showInstallScreen();
+  }
+
+  route();
+
+  // ── Tab switching (install-instructions screen only) ────────────
+  var tabs = document.querySelectorAll(".tab-btn");
+  var panels = document.querySelectorAll(".panel");
+  function selectTab(name){
+    tabs.forEach(function(t){ t.classList.toggle("active", t.dataset.panel === name); });
+    panels.forEach(function(p){ p.classList.toggle("active", p.dataset.panel === name); });
+  }
+  tabs.forEach(function(t){
+    t.addEventListener("click", function(){ selectTab(t.dataset.panel); });
+  });
+
+  // Guess the right starting tab from the user agent (best-effort only -
+  // the tabs above let the person switch manually if this guesses wrong).
+  var ua = navigator.userAgent || "";
+  var guessed = "pc";
+  if(/Android/i.test(ua)) guessed = "android";
+  else if(/iPad|iPhone|iPod/i.test(ua)) guessed = "ios";
+  else if(/Macintosh|Mac OS X/i.test(ua) && !/Windows/i.test(ua)) guessed = "mac";
+  selectTab(guessed);
+
+  // ── Real install prompt (Chrome/Edge on Android + desktop) ──────
+  var deferredPrompt = null;
+  window.addEventListener("beforeinstallprompt", function(e){
+    e.preventDefault();
+    deferredPrompt = e;
+    installNowBtn.style.display = "block";
+  });
+  installNowBtn.addEventListener("click", function(){
+    if(!deferredPrompt) return;
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.finally(function(){ deferredPrompt = null; installNowBtn.style.display = "none"; });
+  });
+  window.addEventListener("appinstalled", function(){
+    // Just installed, but this browser tab itself never becomes the
+    // standalone window - so route to the "already installed" screen
+    // instead of the game, telling them to open the real app.
+    localStorage.setItem("pv_installed", "true");
+    showAlreadyInstalled();
+  });
+
+  // Re-check on return to the tab, in case install state changed elsewhere.
+  window.addEventListener("focus", route);
+  document.addEventListener("visibilitychange", function(){ if(!document.hidden) route(); });
+})();
+</script>
+
+</body>
+</html>
