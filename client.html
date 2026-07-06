@@ -231,13 +231,13 @@ input{font-family:'Courier New',monospace;}
 .popup-header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px 10px;border-bottom:1px solid #333;flex-shrink:0;}
 .popup-title{font-size:12px;color:#bbb;letter-spacing:2px;font-weight:bold;}
 .popup-close{background:#000;border:1px solid #333;border-radius:3px;color:#aaa;font-size:12px;padding:3px 8px;}
-.popup-body{overflow-y:auto;padding:12px 14px 20px;flex:1;touch-action:pan-y;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;}
+.popup-body{overflow-y:scroll;box-sizing:border-box;width:calc(100% + 20px);padding:12px 34px 20px 14px;flex:1;touch-action:pan-y;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none;-ms-overflow-style:none;}
 /* Full popup */
-.fullpopup{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#000;z-index:300;flex-direction:column;max-width:430px;margin:0 auto;}
+.fullpopup{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#000;z-index:300;flex-direction:column;max-width:430px;margin:0 auto;overflow:hidden;}
 .fullpopup.show{display:flex;}
 .fullpopup-header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px 10px;border-bottom:1px solid #333;flex-shrink:0;}
 .fullpopup-title{font-size:13px;color:#bbb;letter-spacing:2px;font-weight:bold;}
-.fullpopup-body{overflow-y:auto;flex:1;padding:12px 14px 20px;touch-action:pan-y;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;}
+.fullpopup-body{overflow-y:scroll;box-sizing:border-box;width:calc(100% + 20px);flex:1;padding:12px 34px 20px 14px;touch-action:pan-y;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none;-ms-overflow-style:none;}
 /* Market sub-tabs */
 .subtab-bar{display:flex;gap:4px;margin-bottom:10px;}
 .subtab-btn{flex:1;padding:5px 2px;background:#000;border:1px solid #333;border-radius:3px;color:#555;font-size:9px;user-select:none;-webkit-user-select:none;}
@@ -824,12 +824,12 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 .dev-chain-atom select,.dev-chain-atom input{background:#010a12!important;color:#7aaccc!important;border-color:#0a1a28!important;}
 .dev-chain-atom select:focus,.dev-chain-atom input:focus{outline:none!important;border-color:#0077aa!important;}
 /* ── Admin Terminal ─────────────────────────────────────────────────────── */
-#admin-terminal{position:fixed;top:0;left:0;right:0;bottom:0;background:#000;z-index:9500;display:flex;flex-direction:column;font-family:'Courier New',monospace;transition:bottom 0.22s ease;will-change:bottom;}
+#admin-terminal{position:fixed;top:0;left:0;right:0;bottom:0;background:#000;z-index:9500;display:flex;flex-direction:column;font-family:'Courier New',monospace;transition:bottom 0.22s ease;will-change:bottom;overflow:hidden;}
 #admin-terminal.vkb-up{bottom:min(269px,42vh);}
 #admin-terminal-bar{background:#0a0a0a;border-bottom:1px solid #1a1a1a;padding:10px 12px;display:flex;align-items:center;gap:8px;flex-shrink:0;}
 #admin-terminal-title{color:#00ff88;font-size:clamp(9px,2.5vw,12px);letter-spacing:2px;flex:1;}
 #admin-terminal-close{background:#000;border:1px solid #555;color:#eee;font-size:clamp(10px,3vw,13px);padding:8px 16px;cursor:pointer;font-family:'Courier New',monospace;letter-spacing:1px;-webkit-tap-highlight-color:transparent;touch-action:manipulation;position:relative;z-index:9600;min-width:80px;min-height:40px;}
-#admin-terminal-output{flex:1;overflow-y:auto;overflow-x:hidden;padding:10px 12px;font-size:clamp(10px,2.8vw,13px);line-height:1.6;color:#00ff88;min-height:0;scrollbar-width:none;-ms-overflow-style:none;touch-action:pan-y;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;}
+#admin-terminal-output{flex:1;box-sizing:border-box;width:calc(100% + 20px);overflow-y:scroll;overflow-x:hidden;padding:10px 32px 10px 12px;font-size:clamp(10px,2.8vw,13px);line-height:1.6;color:#00ff88;min-height:0;scrollbar-width:none;-ms-overflow-style:none;touch-action:pan-y;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;}
 #admin-terminal-output::-webkit-scrollbar{display:none;}
 #admin-terminal-output .t-line{white-space:pre-wrap;word-break:break-word;}
 #admin-terminal-output .t-cmd{color:#ffd700;}
@@ -2435,6 +2435,43 @@ function _lsGet(k){try{const v=localStorage.getItem(k);return v;}catch(e){return
 function _lsSet(k,v){try{localStorage.setItem(k,v);}catch(e){_mem[k]=v;}}
 function _lsDel(k){try{localStorage.removeItem(k);}catch(e){delete _mem[k];}}
 
+// ── Native (App Inventor) username backup ──────────────────────────────────
+// The standalone app's Android WebView does NOT reliably keep localStorage
+// between app launches — some devices/OS versions clear WebView site data as
+// if it were disposable cache. AppInventor.setWebViewString()/getWebViewString()
+// is backed by a TinyDB value on the native side (see Screen1 blocks) and
+// survives that. In a normal browser window.AppInventor doesn't exist, so
+// these are safe no-ops there.
+function _nativeSetUsername(u){
+  try{
+    if(window.AppInventor&&window.AppInventor.setWebViewString&&u){
+      window.AppInventor.setWebViewString("pv_uname:"+u);
+    }
+  }catch(e){}
+}
+function _nativeGetUsername(){
+  try{
+    if(window.AppInventor&&window.AppInventor.getWebViewString){
+      const raw=window.AppInventor.getWebViewString();
+      if(raw&&raw.indexOf("pv_uname:")===0)return raw.slice(9);
+    }
+  }catch(e){}
+  return null;
+}
+// On startup in the native app, if localStorage lost the value but the
+// native side still has it, restore it into localStorage so all the
+// existing _lsGet("pv_last_uname")/pv_remember logic keeps working untouched.
+(function _restoreNativeUsername(){
+  try{
+    if(!/[?&]pvapp=1(&|$)/.test(location.search))return;
+    const fromNative=_nativeGetUsername();
+    if(fromNative&&!_lsGet("pv_last_uname")){
+      _lsSet("pv_last_uname",fromNative);
+      _lsSet("pv_remember",JSON.stringify({u:fromNative}));
+    }
+  }catch(e){}
+})();
+
 // ── Catalog cache (items + zones) ───────────────────────────────────────────
 // Catalogs are stored in localStorage so repeat logins skip the full download.
 // Server sends catalog_versions on auth; client only fetches what has changed.
@@ -3376,7 +3413,7 @@ window.addEventListener("beforeunload",()=>{
     }
     presenceSetOffline(STATE.username);
     _lsDel("pv_remember");
-    try{_lsSet("pv_last_uname",STATE.username);}catch(e){}
+    try{_lsSet("pv_last_uname",STATE.username);_nativeSetUsername(STATE.username);}catch(e){}
   }
 });
 // pagehide backup for mobile browsers that skip beforeunload
@@ -5031,7 +5068,7 @@ function doLogout(){
   if(STATE.username){
     presenceSetOffline(STATE.username);
     _inviteQueue.length=0;_inviteQueueRunning=false;
-    try{_lsSet('pv_last_uname',STATE.username);}catch(e){}
+    try{_lsSet('pv_last_uname',STATE.username);_nativeSetUsername(STATE.username);}catch(e){}
     _lsDel('pv_remember');
   }
   // Null out auth and username so beforeunload/pagehide don't re-save session
@@ -20099,7 +20136,7 @@ function setupLogin(){
         return;
       }
     }
-    function saveRemember(u){_lsSet("pv_remember",JSON.stringify({u}));try{_lsSet("pv_last_uname",u);}catch(e){}}
+    function saveRemember(u){_lsSet("pv_remember",JSON.stringify({u}));try{_lsSet("pv_last_uname",u);_nativeSetUsername(u);}catch(e){}}
 
     // All validation passed — close keyboard and connect to server
     if(window._vkbClose)window._vkbClose();
@@ -20995,7 +21032,7 @@ function init(){
   window._vkbOnType={
     uname:function(){
       var u=(window._vkbGetVal?window._vkbGetVal("login-uname"):"").trim();
-      try{_lsSet("pv_remember",JSON.stringify({u:u}));_lsSet("pv_last_uname",u);}catch(e){}
+      try{_lsSet("pv_remember",JSON.stringify({u:u}));_lsSet("pv_last_uname",u);_nativeSetUsername(u);}catch(e){}
     },
     friendadd:(function(){
       var _debTimer=null;
