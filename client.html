@@ -4,21 +4,10 @@
 <meta charset="UTF-8"/>
 <meta name="theme-color" content="#000000"/>
 <meta name="color-scheme" content="dark"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-visual, viewport-fit=cover"/>
-<meta name="mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<link rel="manifest" href="manifest.json"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-visual"/>
+<meta name="display" content="fullscreen"/>
 <link rel="icon" href="icon-192.png"/>
-<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
 <title>Project Void v2</title>
-<script>
-if("serviceWorker" in navigator){
-  window.addEventListener("load",function(){
-    navigator.serviceWorker.register("sw.js").catch(function(){});
-  });
-}
-</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{height:100svh;max-height:100svh;background:#000;font-family:'Courier New',monospace;color:#fff;overflow:hidden;overscroll-behavior:none;touch-action:none;}
@@ -33,6 +22,11 @@ html,body{height:100svh;max-height:100svh;background:#000;font-family:'Courier N
 #rotate-lock-overlay .rl-icon{font-size:48px;margin-bottom:16px;animation:rl-spin 1.8s ease-in-out infinite;}
 #rotate-lock-overlay .rl-text{font-size:14px;letter-spacing:2px;color:#bbb;}
 @keyframes rl-spin{0%,100%{transform:rotate(0deg);}50%{transform:rotate(-90deg);}}
+#fs-resume-overlay{display:none;position:fixed;inset:0;z-index:999998;background:#000;color:#fff;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;font-family:'Courier New',monospace;cursor:pointer;}
+#fs-resume-overlay.show{display:flex;}
+#fs-resume-overlay .fr-icon{font-size:40px;margin-bottom:16px;animation:fr-pulse 1.6s ease-in-out infinite;}
+#fs-resume-overlay .fr-text{font-size:14px;letter-spacing:2px;color:#bbb;}
+@keyframes fr-pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
 *::-moz-selection{background:transparent!important;color:inherit!important;}
 input,textarea{-webkit-user-select:text!important;user-select:text!important;-webkit-touch-callout:default!important;}
 button:active,button:focus,button:focus-visible{outline:none!important;box-shadow:none!important;-webkit-tap-highlight-color:transparent!important;-webkit-appearance:none!important;}
@@ -1295,11 +1289,73 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 </style>
 </head>
 <body>
+<script>
+// ── Auto-fullscreen on entry ─────────────────────────────────────────────
+// Chrome/Android carries the "user activation" from the Enter button tap
+// on the landing page into this page load, so requesting fullscreen
+// immediately often succeeds with no extra tap needed. If the browser
+// blocks it (no carried-over activation, e.g. iOS Safari which doesn't
+// support this API at all, or a direct/bookmarked visit), a single
+// invisible full-page tap-catcher guarantees it fires on the very first
+// real tap instead, then gets out of the way permanently.
+(function(){
+  function requestFs(){
+    var el = document.documentElement;
+    var req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+    if(!req) return Promise.reject(new Error("unsupported"));
+    try{ return req.call(el) || Promise.resolve(); }catch(e){ return Promise.reject(e); }
+  }
+  function isFullscreen(){
+    return !!(document.fullscreenElement||document.webkitFullscreenElement||document.mozFullScreenElement||document.msFullscreenElement);
+  }
+  function armTapCatcher(){
+    if(isFullscreen())return;
+    var catcher=document.createElement("div");
+    catcher.id="_fsCatcher";
+    catcher.style.cssText="position:fixed;inset:0;z-index:999999;background:transparent;";
+    document.body.appendChild(catcher);
+    var done=false;
+    function onTap(){
+      if(done)return; done=true;
+      requestFs().catch(function(){});
+      catcher.remove();
+      document.removeEventListener("pointerdown",onTap,true);
+    }
+    document.addEventListener("pointerdown",onTap,true);
+  }
+  function init(){
+    if(window.top!==window.self){ return; } // embedded in an iframe — parent page handles fullscreen
+    requestFs().catch(function(){ armTapCatcher(); });
+  }
+  if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",init);}else{init();}
+})();
+</script>
+
 <div id="rotate-lock-overlay">
   <div class="rl-icon">⟳</div>
   <div class="rl-text">ROTATE YOUR DEVICE<br/>BACK TO PORTRAIT</div>
 </div>
 
+<div id="fs-resume-overlay">
+  <div class="fr-icon">⛶</div>
+  <div class="fr-text">TAP TO CONTINUE</div>
+</div>
+<script>
+// Hide mobile URL bar on load - scroll trick forces browser chrome to collapse
+(function(){
+  // Set body min-height slightly taller than viewport to enable scroll-away
+  document.documentElement.style.height="100.1%";
+  // On load, scroll down 1px then back - triggers URL bar collapse on most mobile browsers
+  function _hideBar(){
+    if(!window.matchMedia("(display-mode: standalone)").matches&&!window.matchMedia("(display-mode: fullscreen)").matches){
+      window.scrollTo(0,1);
+      setTimeout(function(){window.scrollTo(0,0);document.documentElement.style.height="100%";},20);
+    }
+  }
+  if(document.readyState==="complete")_hideBar();
+  else window.addEventListener("load",_hideBar);
+})();
+</script>
 <div id="_cover" style="position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;background:#000;z-index:99999;margin:0;padding:0;"></div>
 
 <div id="app">
@@ -2197,6 +2253,103 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 </div><!-- #app -->
 
 <script>
+// ── Force fullscreen - re-enter on any tap, but don't fight the exit gesture itself ──
+(function(){
+  function _lockPortrait(){
+    try{
+      if(screen.orientation&&screen.orientation.lock){
+        screen.orientation.lock("portrait").catch(function(){});
+      }
+    }catch(e){}
+  }
+  window._lockPortrait=_lockPortrait;
+  function _isFsActive(){
+    return !!(document.fullscreenElement||document.webkitFullscreenElement)||window.matchMedia("(display-mode: standalone)").matches;
+  }
+  function _forceFullscreen(){
+    var _dlOv=document.getElementById("devlog-overlay");
+    if(_dlOv&&_dlOv.style.display!=="none")return false;
+    if(document.fullscreenElement||document.webkitFullscreenElement){_lockPortrait();return false;}
+    if(window.matchMedia("(display-mode: standalone)").matches){_lockPortrait();return false;}
+    var el=document.documentElement;
+    if(el.requestFullscreen){el.requestFullscreen({navigationUI:"hide"}).then(_lockPortrait).catch(function(){});return true;}
+    else if(el.webkitRequestFullscreen){el.webkitRequestFullscreen();return true;}
+    return false;
+  }
+  window._forceFullscreen=_forceFullscreen;
+
+  // ── "Tap to continue" overlay: shown any time we're not in fullscreen ────
+  // NOTE: this is a *resume* prompt (tab-back, bfcache exit, etc.), not part of the
+  // initial Launch flow. On first entry, the auto-fullscreen tap-catcher (see the
+  // separate script near the top of <body>) handles getting into fullscreen silently,
+  // carrying over the Launch button's activation with no visible overlay. So this
+  // overlay stays suppressed until fullscreen has actually been achieved at least once;
+  // only after that first success does dropping out of fullscreen trigger the prompt.
+  var _fsEverActivated=false;
+  var _frOv=null;
+  function _updateFsResumeOverlay(){
+    if(!_frOv)_frOv=document.getElementById("fs-resume-overlay");
+    if(!_frOv)return;
+    var _dlOv=document.getElementById("devlog-overlay");
+    if(_dlOv&&_dlOv.style.display!=="none"){_frOv.classList.remove("show");return;}
+    if(!_fsEverActivated||_isFsActive())_frOv.classList.remove("show");
+    else _frOv.classList.add("show");
+  }
+  window._updateFsResumeOverlay=_updateFsResumeOverlay;
+
+  // Tapping anywhere (including the overlay) re-enters fullscreen on pointerdown,
+  // so it happens the instant a finger touches the glass rather than waiting for
+  // the click that follows it.
+  // IMPORTANT: only ONE requestFullscreen() call may happen per physical tap. Calling
+  // it again from the click that follows the same tap can consume/reject the gesture's
+  // activation and force an actual second tap to recover - which is the exact bug this
+  // guards against. So click only acts as a fallback when pointerdown didn't already try.
+  var _fsLastAttempt=0;
+  document.addEventListener("pointerdown",function(){
+    if(!_isFsActive()){
+      try{if(!document.hasFocus())window.focus();}catch(e){}
+      if(_forceFullscreen())_fsLastAttempt=Date.now();
+    }
+  },true);
+  document.addEventListener("click",function(){
+    if(Date.now()-_fsLastAttempt<800)return; // already handled by pointerdown for this tap
+    _forceFullscreen();
+  });
+  document.addEventListener("keydown",_forceFullscreen);
+  document.addEventListener("fullscreenchange",function(){
+    if(document.fullscreenElement){_lockPortrait();_fsEverActivated=true;}
+    _updateFsResumeOverlay();
+  });
+  document.addEventListener("webkitfullscreenchange",function(){
+    if(document.webkitFullscreenElement)_fsEverActivated=true;
+    _lockPortrait();
+    _updateFsResumeOverlay();
+  });
+  // Deliberately NOT re-forcing from the fullscreenchange event itself - that's what caused
+  // the back button to need multiple taps (it was fighting the exit gesture in real time).
+  // The next ordinary tap on the page (from the listeners above) will bring it back.
+  // Try immediately on load (will fail without gesture but costs nothing)
+  _forceFullscreen();
+  _lockPortrait();
+  _updateFsResumeOverlay();
+  document.addEventListener("visibilitychange",function(){
+    if(document.visibilityState==="visible"){
+      _updateFsResumeOverlay();
+      // Some browsers (esp. Android Chrome) treat the very first tap after a tab/app
+      // switch as "just refocusing the window" and don't grant it real activation for
+      // the Fullscreen API - the tap is spent on refocus, not on the fullscreen request,
+      // which is exactly what forced the extra second tap. Pro-actively refocusing here
+      // (a script-triggered focus() doesn't need a gesture) means by the time the real
+      // tap lands, the window is already focused, so that tap's activation goes entirely
+      // toward the fullscreen request instead.
+      try{window.focus();}catch(e){}
+    }
+  });
+  // Safety net: some browsers exit fullscreen (e.g. via OS gesture) without firing
+  // fullscreenchange reliably, so poll lightly to keep the overlay in sync.
+  setInterval(_updateFsResumeOverlay,800);
+})();
+
 // ========================================
 //  WEBSOCKET CONFIG
 // ========================================
@@ -21148,6 +21301,8 @@ function init(){
   const _devlogOverlay=document.getElementById("devlog-overlay");
   const _devlogBtn=document.getElementById("devlog-continue");
   if(_devlogOverlay&&_devlogBtn){
+    // Fullscreen is now handled by the global document-level click listener
+    // (_forceFullscreen) instead of being triggered here directly.
     // Force touch scrolling to work inside devlog by stopping propagation
     _devlogOverlay.addEventListener("touchstart",function(e){e.stopPropagation();},{passive:true});
     _devlogOverlay.addEventListener("touchmove",function(e){e.stopPropagation();},{passive:true});
@@ -21192,6 +21347,16 @@ function init(){
         }else if(_ls){
           _ls.classList.add("active");
         }
+        // Don't stopPropagation/stopImmediatePropagation and don't call
+        // requestFullscreen() here ourselves - doing so from a pointerdown
+        // handler is what caused the "need to tap twice" bug: Android does
+        // not always treat pointerdown as valid user-activation for the
+        // Fullscreen API, and a rejected/stalled fullscreen request can
+        // freeze the visual frame even though the DOM already updated
+        // underneath, until a second tap forces a repaint. Instead let this
+        // event bubble naturally to the document-level click/pointerdown
+        // handler (_forceFullscreen), which uses the more reliable "click"
+        // activation and already checks devlog-overlay's display state.
     },{passive:true});
 
     // Tab switching
@@ -21316,6 +21481,13 @@ window.addEventListener("pageshow",function(e){
 // ── visibilitychange: snap reconnect screen immediately when tab comes back ───
 document.addEventListener("visibilitychange",function(){
   if(document.visibilityState==="visible"){
+    // Deliberately NOT calling _forceFullscreen() here: requestFullscreen() without a
+    // real user gesture is guaranteed to be rejected, and on some browsers (notably
+    // Android Chrome) that rejected attempt leaves the Fullscreen API in a state where
+    // the very next real tap's request also gets rejected - forcing an extra throwaway
+    // tap to recover. The "tap to continue" overlay (fs-resume-overlay) is the intended
+    // recovery path now: it's shown by _updateFsResumeOverlay whenever not fullscreen,
+    // and the first real tap on it enters fullscreen cleanly.
     // If WS is down and 2s threshold has passed, show reconnect screen now
     if((!_partyWs||_partyWs.readyState!==1)&&STATE&&STATE.player&&STATE.player.name){
       if(window._rcDelayTimer){
@@ -21431,11 +21603,13 @@ document.addEventListener("selectionchange",()=>{
         // Height grew a lot = keyboard closed or orientation change, update lock
         baseH = newH;
         applyHeight(newH);
+      } else if(delta < -KEYBOARD_THRESHOLD){
+        // Height shrank a lot = keyboard opened, do NOT resize layout
+        // just keep current locked height
       } else {
-        // Small change (nav-bar swipe-reveal, keyboard, or other transient system
-        // UI) - do NOT resize layout. The nav bar is meant to overlay on top of
-        // the app, not push/shrink it, so we deliberately ignore small deltas
-        // in both directions and keep the locked height exactly as-is.
+        // Small change (browser chrome hide/show) - follow it
+        baseH = newH;
+        applyHeight(newH);
       }
     }, {passive:true});
   }
