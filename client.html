@@ -2266,13 +2266,14 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   function _isFsActive(){
     return !!(document.fullscreenElement||document.webkitFullscreenElement)||window.matchMedia("(display-mode: standalone)").matches;
   }
+  window._isFsActive=_isFsActive;
   function _forceFullscreen(){
     var _dlOv=document.getElementById("devlog-overlay");
     if(_dlOv&&_dlOv.style.display!=="none")return false;
     if(document.fullscreenElement||document.webkitFullscreenElement){_lockPortrait();return false;}
     if(window.matchMedia("(display-mode: standalone)").matches){_lockPortrait();return false;}
     var el=document.documentElement;
-    if(el.requestFullscreen){el.requestFullscreen({navigationUI:"hide"}).then(_lockPortrait).catch(function(){});return true;}
+    if(el.requestFullscreen){el.requestFullscreen({navigationUI:"auto"}).then(_lockPortrait).catch(function(){});return true;}
     else if(el.webkitRequestFullscreen){el.webkitRequestFullscreen();return true;}
     return false;
   }
@@ -2305,25 +2306,36 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   // activation and force an actual second tap to recover - which is the exact bug this
   // guards against. So click only acts as a fallback when pointerdown didn't already try.
   var _fsLastAttempt=0;
-  document.addEventListener("pointerdown",function(){
+  var _EDGE_SAFE_ZONE=40; // px from bottom of screen to leave alone for OS gesture-nav swipes
+  document.addEventListener("pointerdown",function(e){
+    // Don't fight a touch that starts in the bottom edge strip - that's almost
+    // certainly the start of an Android gesture-nav swipe (home/switch-apps),
+    // not a tap meant for the game. Re-forcing fullscreen here is what caused
+    // the swipe to get eaten/re-triggered mid-gesture.
+    if(e&&typeof e.clientY==="number"&&e.clientY>=window.innerHeight-_EDGE_SAFE_ZONE)return;
     if(!_isFsActive()){
       try{if(!document.hasFocus())window.focus();}catch(e){}
       if(_forceFullscreen())_fsLastAttempt=Date.now();
     }
   },true);
-  document.addEventListener("click",function(){
+  document.addEventListener("click",function(e){
     if(Date.now()-_fsLastAttempt<800)return; // already handled by pointerdown for this tap
+    if(e&&typeof e.clientY==="number"&&e.clientY>=window.innerHeight-_EDGE_SAFE_ZONE)return;
     _forceFullscreen();
   });
   document.addEventListener("keydown",_forceFullscreen);
   document.addEventListener("fullscreenchange",function(){
     if(document.fullscreenElement){_lockPortrait();_fsEverActivated=true;}
     _updateFsResumeOverlay();
+    if(document.fullscreenElement){ if(typeof _resumeInterruptedMedia==='function')_resumeInterruptedMedia(); }
+    else{ if(typeof _pauseMusicForBackground==='function')_pauseMusicForBackground(); }
   });
   document.addEventListener("webkitfullscreenchange",function(){
     if(document.webkitFullscreenElement)_fsEverActivated=true;
     _lockPortrait();
     _updateFsResumeOverlay();
+    if(document.webkitFullscreenElement){ if(typeof _resumeInterruptedMedia==='function')_resumeInterruptedMedia(); }
+    else{ if(typeof _pauseMusicForBackground==='function')_pauseMusicForBackground(); }
   });
   // Deliberately NOT re-forcing from the fullscreenchange event itself - that's what caused
   // the back button to need multiple taps (it was fighting the exit gesture in real time).
@@ -3617,6 +3629,61 @@ const _pvBgmTracks={
 // same default or the login theme would never load.
 _pvBgmTracks["login-bgm"].src="music/Login.mp3";
 function _pvBgm(id){ return _pvBgmTracks[id]||null; }
+
+// ========================================
+//  ONE-SHOT SOUND EFFECTS (SFX) — same fullscreen-gated Web Audio engine
+// ========================================
+// Route ALL future sound effects (hits, clicks, UI blips, loot pings, etc.)
+// through _pvPlaySfx() instead of a raw <audio> tag or a hand-rolled
+// AudioBufferSourceNode. Doing so automatically gets you, for free:
+//   - it never starts unless the game is genuinely fullscreened right now
+//     (same rule as BGM - nothing should ever play behind the
+//     "TAP TO CONTINUE" overlay or while a tab/app switch has us backgrounded)
+//   - it gets cut instantly the moment fullscreen is exited mid-playback,
+//     via _pvStopAllSfx() (wired into _pauseMusicForBackground below) - a
+//     one-shot has no meaningful "paused" state to resume later, so it's
+//     simply silenced rather than picked back up
+//   - it shares the same AudioContext + decoded-buffer cache as BGM, so no
+//     duplicate loading/decoding cost for a sound played more than once
+//
+// Usage:
+//   _pvPlaySfx("sfx/hit.mp3");         // full volume
+//   _pvPlaySfx("sfx/ui-click.mp3", 0.5); // 50% volume
+const _pvActiveSfxNodes = new Set();
+function _pvPlaySfx(src, volume){
+  if(!src)return;
+  if(!(window._isFsActive&&window._isFsActive()))return; // silent no-op outside fullscreen
+  _pvUnlockAudioCtx();
+  const ctx=_pvGetAudioCtx();
+  if(!ctx)return;
+  _pvLoadBuffer(src).then(buf=>{
+    if(!buf)return;
+    // Re-check here too - loading/decoding takes a moment, and fullscreen
+    // may have been exited in the meantime.
+    if(!(window._isFsActive&&window._isFsActive()))return;
+    const node=ctx.createBufferSource();
+    node.buffer=buf;
+    if(volume!=null&&ctx.createGain){
+      const gain=ctx.createGain();
+      gain.gain.value=volume;
+      node.connect(gain);
+      gain.connect(ctx.destination);
+    }else{
+      node.connect(ctx.destination);
+    }
+    node.onended=()=>{ _pvActiveSfxNodes.delete(node); };
+    _pvActiveSfxNodes.add(node);
+    try{ node.start(0); }catch(e){ _pvActiveSfxNodes.delete(node); }
+  }).catch(()=>{});
+}
+function _pvStopAllSfx(){
+  _pvActiveSfxNodes.forEach(node=>{
+    try{ node.onended=null; node.stop(); }catch(e){}
+    try{ node.disconnect(); }catch(e){}
+  });
+  _pvActiveSfxNodes.clear();
+}
+window._pvPlaySfx=_pvPlaySfx;
 
 function escHtml(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 function _capFirst(s){return s?s.charAt(0).toUpperCase()+s.slice(1):s;}
@@ -14920,7 +14987,7 @@ const _EVENT_MUSIC={victory:"Victory.mp3",death:"Death.mp3",flee:"Flee.mp3",bers
 // comes back to the foreground - _resumeInterruptedMedia (wired to
 // visibilitychange/focus/pageshow) picks it up and starts it then.
 function _pvPlayIfVisible(track){
-  if(!track||document.hidden)return;
+  if(!track||!(window._isFsActive&&window._isFsActive()))return;
   const _p=track.play();
   if(_p&&_p.catch)_p.catch(()=>{});
 }
@@ -15135,6 +15202,11 @@ function _revertActivityBackground(){
 // (mid travel-transition, post-logout, etc.), so that case is left alone —
 // only tracks that SHOULD be playing get resumed.
 function _resumeInterruptedMedia(){
+  // Music should only ever be audible while the game is actually fullscreened.
+  // Coming back from a tab switch / app switch often restores tab visibility
+  // or window focus a moment before (or without) fullscreen being restored -
+  // in that gap we're showing the "TAP TO CONTINUE" overlay, so stay silent.
+  if(!(window._isFsActive&&window._isFsActive()))return;
   const activeScreen=document.querySelector(".screen.active");
   const activeId=activeScreen?activeScreen.id:null;
   // Login screen theme + background video — only while that screen is showing.
@@ -15178,6 +15250,7 @@ function _pauseMusicForBackground(){
   if(_bgVid&&!_bgVid.paused)_bgVid.pause();
   const bgm=_pvBgm("zone-bgm");
   if(bgm&&!bgm.paused)bgm.pause();
+  if(typeof _pvStopAllSfx==='function')_pvStopAllSfx();
 }
 document.addEventListener("visibilitychange",()=>{ if(document.hidden)_pauseMusicForBackground(); });
 
