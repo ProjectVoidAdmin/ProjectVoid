@@ -2257,6 +2257,15 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 <script>
 // ── Force fullscreen - re-enter on any tap, but don't fight the exit gesture itself ──
 (function(){
+  // The standalone WebViewer app (App Inventor / Project Void mobile) never
+  // implements the real browser Fullscreen API - requestFullscreen() silently
+  // fails there and document.fullscreenElement is never set. _isFsActive()
+  // below gates ALL zone/activity/event music playback on that flag, so
+  // without this the app plays login music (which bypasses the gate) but
+  // stays silent for every other track forever. The app's WebViewer HomeUrl
+  // must include ?pvapp=1 for this to take effect - see the app-build notes.
+  var _pvIsNativeApp=/[?&]pvapp=1(&|$)/.test(location.search);
+  window._pvIsNativeApp=_pvIsNativeApp;
   function _lockPortrait(){
     try{
       if(screen.orientation&&screen.orientation.lock){
@@ -2266,7 +2275,7 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   }
   window._lockPortrait=_lockPortrait;
   function _isFsActive(){
-    return !!(document.fullscreenElement||document.webkitFullscreenElement)||window.matchMedia("(display-mode: standalone)").matches;
+    return _pvIsNativeApp||!!(document.fullscreenElement||document.webkitFullscreenElement)||window.matchMedia("(display-mode: standalone)").matches;
   }
   window._isFsActive=_isFsActive;
   function _forceFullscreen(){
