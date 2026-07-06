@@ -37,7 +37,7 @@ button:active{opacity:1;}
 .market-buy-btn:active,.market-buy-btn:focus,.market-buy-btn:focus-visible{color:#555!important;outline:none!important;-webkit-tap-highlight-color:transparent!important;background:#000!important;}
 .market-buy-btn.can-buy:active,.market-buy-btn.can-buy:focus,.market-buy-btn.can-buy:focus-visible{color:#ccc!important;background:#000!important;}
 input{font-family:'Courier New',monospace;}
-#app{height:100dvh;display:flex;flex-direction:column;max-width:430px;margin:0 auto;overflow:hidden;-webkit-user-select:none;user-select:none;position:relative;overscroll-behavior:none;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);}
+#app{height:100dvh;display:flex;flex-direction:column;max-width:430px;margin:0 auto;overflow:hidden;-webkit-user-select:none;user-select:none;position:relative;overscroll-behavior:none;}
 .screen{display:none!important;flex-direction:column;height:100%;overflow:hidden;min-height:0;}
 .screen.active{display:flex!important;}
 /* Login */
@@ -2264,16 +2264,16 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   }
   window._lockPortrait=_lockPortrait;
   function _isFsActive(){
-    return !!(document.fullscreenElement||document.webkitFullscreenElement)||window.matchMedia("(display-mode: standalone)").matches||window.matchMedia("(display-mode: fullscreen)").matches;
+    return !!(document.fullscreenElement||document.webkitFullscreenElement)||window.matchMedia("(display-mode: standalone)").matches;
   }
   window._isFsActive=_isFsActive;
   function _forceFullscreen(){
     var _dlOv=document.getElementById("devlog-overlay");
     if(_dlOv&&_dlOv.style.display!=="none")return false;
     if(document.fullscreenElement||document.webkitFullscreenElement){_lockPortrait();return false;}
-    if(window.matchMedia("(display-mode: standalone)").matches||window.matchMedia("(display-mode: fullscreen)").matches){_lockPortrait();return false;}
+    if(window.matchMedia("(display-mode: standalone)").matches){_lockPortrait();return false;}
     var el=document.documentElement;
-    if(el.requestFullscreen){el.requestFullscreen({navigationUI:"auto"}).then(_lockPortrait).catch(function(){});return true;}
+    if(el.requestFullscreen){el.requestFullscreen({navigationUI:"hide"}).then(_lockPortrait).catch(function(){});return true;}
     else if(el.webkitRequestFullscreen){el.webkitRequestFullscreen();return true;}
     return false;
   }
@@ -2306,21 +2306,14 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   // activation and force an actual second tap to recover - which is the exact bug this
   // guards against. So click only acts as a fallback when pointerdown didn't already try.
   var _fsLastAttempt=0;
-  var _EDGE_SAFE_ZONE=40; // px from bottom of screen to leave alone for OS gesture-nav swipes
-  document.addEventListener("pointerdown",function(e){
-    // Don't fight a touch that starts in the bottom edge strip - that's almost
-    // certainly the start of an Android gesture-nav swipe (home/switch-apps),
-    // not a tap meant for the game. Re-forcing fullscreen here is what caused
-    // the swipe to get eaten/re-triggered mid-gesture.
-    if(e&&typeof e.clientY==="number"&&e.clientY>=window.innerHeight-_EDGE_SAFE_ZONE)return;
+  document.addEventListener("pointerdown",function(){
     if(!_isFsActive()){
       try{if(!document.hasFocus())window.focus();}catch(e){}
       if(_forceFullscreen())_fsLastAttempt=Date.now();
     }
   },true);
-  document.addEventListener("click",function(e){
+  document.addEventListener("click",function(){
     if(Date.now()-_fsLastAttempt<800)return; // already handled by pointerdown for this tap
-    if(e&&typeof e.clientY==="number"&&e.clientY>=window.innerHeight-_EDGE_SAFE_ZONE)return;
     _forceFullscreen();
   });
   document.addEventListener("keydown",_forceFullscreen);
@@ -21672,37 +21665,21 @@ document.addEventListener("selectionchange",()=>{
   let baseH = lockedH;
   const KEYBOARD_THRESHOLD = 100; // px - changes smaller than this are chrome show/hide, not keyboard
 
-  let _settleTimer=null;
   if(window.visualViewport){
     window.visualViewport.addEventListener('resize', ()=>{
       const newH = window.visualViewport.height;
       const delta = newH - baseH;
       if(delta > KEYBOARD_THRESHOLD){
         // Height grew a lot = keyboard closed or orientation change, update lock
-        if(_settleTimer){clearTimeout(_settleTimer);_settleTimer=null;}
         baseH = newH;
         applyHeight(newH);
       } else if(delta < -KEYBOARD_THRESHOLD){
-        // Height shrank a lot = keyboard opened, do NOT resize layout.
-        // Also cancel any pending settle-update below, so a keyboard opening
-        // mid-flicker can't get overwritten by a stale small-change update.
-        if(_settleTimer){clearTimeout(_settleTimer);_settleTimer=null;}
+        // Height shrank a lot = keyboard opened, do NOT resize layout
+        // just keep current locked height
       } else {
-        // Small change - this app is always fullscreen/standalone, so there's
-        // no browser chrome to track; a small delta here is just the status/
-        // nav bar flickering as the system UI briefly shows during a swipe.
-        // Reacting to every one of these caused the background/UI to bounce.
-        // Instead, wait for the flicker to stop, then apply once - this still
-        // corrects to the real settled height (so no stale black strip) but
-        // doesn't visibly jump around while the bar is mid-flicker.
-        if(_settleTimer)clearTimeout(_settleTimer);
-        _settleTimer=setTimeout(()=>{
-          _settleTimer=null;
-          const settledH=window.visualViewport.height;
-          if(Math.abs(settledH-baseH)< (KEYBOARD_THRESHOLD*-1)) return; // keyboard opened during the wait, leave it
-          baseH=settledH;
-          applyHeight(settledH);
-        },300);
+        // Small change (browser chrome hide/show) - follow it
+        baseH = newH;
+        applyHeight(newH);
       }
     }, {passive:true});
   }
