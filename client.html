@@ -184,9 +184,9 @@ input{font-family:'Courier New',monospace;}
 .action-empty{font-size:10px;color:#1a1a1a;}
 /* World nav (non-combat) */
 
-.tab-bar{display:flex;justify-content:space-evenly;align-items:center;position:relative;margin:4px 14px 0 14px;border:1px solid #333;background:#000;border-radius:4px;overflow:hidden;}
+.tab-bar{display:flex;justify-content:space-between;align-items:center;position:relative;margin:4px 14px 0 14px;padding:0 6px;border:1px solid #333;background:#000;border-radius:4px;overflow:hidden;}
 #world-nav{flex-shrink:0;display:none;flex-direction:column;height:min(269px,42vh);overflow:hidden;}
-.tab-btn{flex:1;padding:7px 4px 6px;background:#000;border:none;color:#aaa;font-size:10px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0;text-align:center;white-space:nowrap;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent!important;-webkit-touch-callout:none;}
+.tab-btn{flex:0 1 auto;min-width:0;padding:6px;background:#000;border:none;color:#aaa;font-size:10px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0;text-align:center;white-space:nowrap;line-height:normal;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent!important;-webkit-touch-callout:none;}
 .log-panel{padding:0 14px;}
 .log-panel:not(:empty){padding:6px 14px 4px;background:rgba(0,0,0,0.6);border-bottom:1px solid #666;}
 .tab-btn:active,.tab-btn:focus,.tab-btn:focus-visible{background:#000!important;outline:none!important;-webkit-tap-highlight-color:transparent!important;}
@@ -1301,12 +1301,6 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 // invisible full-page tap-catcher guarantees it fires on the very first
 // real tap instead, then gets out of the way permanently.
 (function(){
-  // The app (CustomWebView) actually implements the real Fullscreen API,
-  // unlike the old stock WebViewer where requestFullscreen() silently failed.
-  // Calling it here would trigger the WebView's onShowCustomView(), which
-  // unlocks screen rotation - the app already gets true fullscreen natively
-  // from TaifunTools.HideSystemUI(), so skip this whole script inside the app.
-  if(/[?&]pvapp=1(&|$)/.test(location.search)) return;
   function requestFs(){
     var el = document.documentElement;
     var req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
@@ -2285,12 +2279,6 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   }
   window._isFsActive=_isFsActive;
   function _forceFullscreen(){
-    // The app is already fullscreen natively (TaifunTools.HideSystemUI) and
-    // _isFsActive() above already treats native-app as active for that reason.
-    // CustomWebView actually implements requestFullscreen() (unlike the old
-    // stock WebViewer), and that triggers onShowCustomView() in the WebView,
-    // which unlocks screen rotation - so never call the web Fullscreen API here.
-    if(_pvIsNativeApp)return false;
     var _dlOv=document.getElementById("devlog-overlay");
     if(_dlOv&&_dlOv.style.display!=="none")return false;
     if(document.fullscreenElement||document.webkitFullscreenElement){_lockPortrait();return false;}
