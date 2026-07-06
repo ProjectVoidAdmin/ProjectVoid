@@ -21541,7 +21541,28 @@ function init(){
       scheduleGlitch();
     })();
   }
-  showScreen("login-screen");
+  // Skip this while the devlog splash is still covering the screen - calling
+  // showScreen("login-screen") here arms login-bgm to start on the very next
+  // tap (browsers block the direct .play() below without a gesture, so it
+  // falls back to a "resume on first tap" listener). Since the devlog splash
+  // is what's actually visible at this point, that first tap is usually on
+  // the splash itself (LAUNCH button, a tab, etc.) - so music would start
+  // while still looking at the splash, not the sign-in screen. The devlog
+  // LAUNCH button's own handler already calls showScreen("login-screen")
+  // once the splash is dismissed, so this call is only needed when there's
+  // no splash to skip past in the first place.
+  const _dlOvAtInit=document.getElementById("devlog-overlay");
+  const _dlOvShowing=_dlOvAtInit&&_dlOvAtInit.style.display!=="none";
+  if(_dlOvShowing){
+    // Safety net: whatever the cause, no music should ever be audible while
+    // the devlog/launch splash is the thing on screen. This runs in addition
+    // to (not instead of) skipping showScreen("login-screen") below - that
+    // stops music from ever getting armed in the first place, this makes
+    // sure anything that slipped through some other path gets cut too.
+    if(typeof _silenceAllMusic==="function")_silenceAllMusic();
+  } else {
+    showScreen("login-screen");
+  }
 }
 if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",init);}else{init();}
 
