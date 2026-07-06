@@ -2264,14 +2264,14 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   }
   window._lockPortrait=_lockPortrait;
   function _isFsActive(){
-    return !!(document.fullscreenElement||document.webkitFullscreenElement)||window.matchMedia("(display-mode: standalone)").matches;
+    return !!(document.fullscreenElement||document.webkitFullscreenElement)||window.matchMedia("(display-mode: standalone)").matches||window.matchMedia("(display-mode: fullscreen)").matches;
   }
   window._isFsActive=_isFsActive;
   function _forceFullscreen(){
     var _dlOv=document.getElementById("devlog-overlay");
     if(_dlOv&&_dlOv.style.display!=="none")return false;
     if(document.fullscreenElement||document.webkitFullscreenElement){_lockPortrait();return false;}
-    if(window.matchMedia("(display-mode: standalone)").matches){_lockPortrait();return false;}
+    if(window.matchMedia("(display-mode: standalone)").matches||window.matchMedia("(display-mode: fullscreen)").matches){_lockPortrait();return false;}
     var el=document.documentElement;
     if(el.requestFullscreen){el.requestFullscreen({navigationUI:"auto"}).then(_lockPortrait).catch(function(){});return true;}
     else if(el.webkitRequestFullscreen){el.webkitRequestFullscreen();return true;}
