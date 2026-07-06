@@ -2275,11 +2275,6 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
     }catch(e){}
   }
   window._lockPortrait=_lockPortrait;
-  function _isInstalledFullscreenMode(){
-    // True immersive display mode: no system UI at all (status bar included).
-    // Only some platforms actually honor manifest display:"fullscreen" as this mode.
-    return window.matchMedia("(display-mode: fullscreen)").matches;
-  }
   function _isInstalledStandaloneMode(){
     // Standalone removes browser chrome (URL bar) but Android still shows the
     // system status bar here - it is NOT the same as true fullscreen, so we
@@ -2287,18 +2282,22 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
     return window.matchMedia("(display-mode: standalone)").matches;
   }
   function _isFsActive(){
-    return !!(document.fullscreenElement||document.webkitFullscreenElement)||_isInstalledFullscreenMode();
+    // IMPORTANT: display-mode:fullscreen alone is NOT sufficient. Chrome only
+    // extends content under the display cutout/notch (short-edges) when a real
+    // Fullscreen Element is active - being launched as an installed "fullscreen"
+    // WebAPK does not by itself trigger that. So "active" always means the real
+    // Fullscreen API is actually engaged, regardless of display-mode.
+    return !!(document.fullscreenElement||document.webkitFullscreenElement);
   }
   function _forceFullscreen(){
     var _dlOv=document.getElementById("devlog-overlay");
     if(_dlOv&&_dlOv.style.display!=="none")return false;
     if(document.fullscreenElement||document.webkitFullscreenElement){_lockPortrait();return false;}
-    if(_isInstalledFullscreenMode()){_lockPortrait();return false;}
     var el=document.documentElement;
     if(el.requestFullscreen){el.requestFullscreen({navigationUI:"hide"}).then(_lockPortrait).catch(function(){});return true;}
     else if(el.webkitRequestFullscreen){el.webkitRequestFullscreen();return true;}
-    // No Fullscreen API available (rare in standalone) - at least lock orientation.
-    if(_isInstalledStandaloneMode())_lockPortrait();
+    // No Fullscreen API available at all - at least lock orientation.
+    _lockPortrait();
     return false;
   }
   window._forceFullscreen=_forceFullscreen;
