@@ -15184,6 +15184,10 @@ document.addEventListener("visibilitychange",()=>{ if(document.hidden)_pauseMusi
 document.addEventListener("visibilitychange",()=>{ if(!document.hidden)_resumeInterruptedMedia(); });
 window.addEventListener("focus",_resumeInterruptedMedia);
 window.addEventListener("pageshow",_resumeInterruptedMedia);
+// Backup signal: some Android browsers (Samsung Internet's tab switcher, split-
+// screen, etc.) don't reliably flip document.hidden when their own UI covers the
+// page, but window blur/focus still fires correctly in those same cases.
+window.addEventListener("blur",_pauseMusicForBackground);
 
 function showTravelScreen(zoneName, isSafe, onDone, zoneId, onBgReady){
   // Wrap onDone so every zone-change path (leader travel, party-follow,
