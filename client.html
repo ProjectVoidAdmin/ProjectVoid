@@ -150,6 +150,7 @@ input{font-family:'Courier New',monospace;}
 .enemy-card{border:1px solid #661111;border-radius:4px;padding:5px 6px;background:#000;cursor:pointer;text-align:center;min-width:0;position:relative;overflow:hidden;height:min(44px,7vh);box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;}
 .enemy-card.targeted{border:2px solid #ff2222;}
 .enemy-card.dead{opacity:0.35;cursor:default;}
+.enemy-card-empty{border:1px solid #3a1a1a;border-radius:4px;padding:5px 6px;background:#000;box-sizing:border-box;position:relative;overflow:hidden;height:min(44px,7vh);opacity:0.35;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;}
 .enemy-name{font-size:9px;color:#fff;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;width:100%;}
 .enemy-bar-bg{height:3px;background:#1a1a1a;border-radius:2px;overflow:hidden;margin-bottom:2px;width:100%;}
 .enemy-bar-fill{height:100%;background:#cc2020;border-radius:2px;transition:width 0.2s;}
@@ -194,7 +195,7 @@ input{font-family:'Courier New',monospace;}
 .tab-content{padding:10px 14px 16px;flex:1;overflow-y:auto;min-height:0;touch-action:pan-y;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;}
 /* Shared blocks */
 .sblock{border:1px solid #333;border-radius:4px;overflow:hidden;margin-bottom:7px;}
-.sblock-head{font-size:9px;color:#aaa;letter-spacing:2px;padding:5px 12px 4px;border-bottom:1px solid #333;background:#0a0a0a;}
+.sblock-head{font-size:9px;color:#aaa;letter-spacing:2px;padding:4px 12px 3px;border-bottom:1px solid #333;background:#0a0a0a;display:flex;align-items:center;min-height:15px;box-sizing:content-box;}
 .sblock-body{padding:4px 12px 4px;background:#000;}
 /* Guild box */
 .guild-member-online{color:#44ee44;}
@@ -253,7 +254,7 @@ input{font-family:'Courier New',monospace;}
 .list-item-btn.selected{border-color:#888;}
 .list-item-btn.danger{border-color:#cc2020;color:#cc2020;}
 .popup-dropdown{border:1px solid #333;border-radius:4px;overflow:hidden;margin-bottom:7px;}
-.popup-dropdown-hdr{display:flex;align-items:center;justify-content:space-between;padding:5px 12px 4px;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;background:#0a0a0a;border-bottom:1px solid transparent;}
+.popup-dropdown-hdr{display:flex;align-items:center;justify-content:space-between;padding:4px 12px 3px;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;background:#0a0a0a;border-bottom:1px solid transparent;min-height:15px;box-sizing:content-box;}
 .popup-dropdown.open .popup-dropdown-hdr{border-bottom-color:#333;}
 .popup-dropdown-hdr span{font-size:9px;letter-spacing:2px;color:#aaa;}
 .popup-dropdown-arrow{font-size:10px;color:#666;transition:transform 0.2s ease;}
@@ -304,7 +305,7 @@ input{font-family:'Courier New',monospace;}
 .enter-btn.ready{background:#0a0a0a;border-color:#888;color:#ddd;cursor:pointer;}
 .enter-btn:disabled{pointer-events:none;-webkit-tap-highlight-color:transparent;}
 /* Travel */
-.zone-travel-btn{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;width:100%;box-sizing:border-box;border:none;border-bottom:1px solid #1a1a1a;border-radius:0;background:#000;text-align:left;cursor:pointer;font-family:'Courier New',monospace;-webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none;-webkit-user-select:none;}
+.zone-travel-btn{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;width:100%;box-sizing:border-box;border:none;border-bottom:1px solid #1a1a1a;border-radius:0;background:#000;text-align:left;cursor:pointer;font-family:'Courier New',monospace;-webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none;-webkit-user-select:none;}
 .zone-travel-btn:last-child{border-bottom:none;}
 .zone-travel-btn:disabled{opacity:0.4;cursor:default;}
 /* Quests */
@@ -11887,6 +11888,17 @@ function _buildEnemyCard(e){
   div.dataset.lastHp=String(e.hp);
   return div;
 }
+// Build a faded placeholder for an unused enemy slot - mirrors the empty party-slot look.
+function _buildEmptyEnemyCard(slotNum){
+  const div=document.createElement("div");
+  div.className="enemy-card-empty";
+  div.innerHTML=`<div style="font-size:9px;color:#663333;letter-spacing:1px;">ENEMY ${slotNum}</div><div style="font-size:8px;color:#442222;margin-top:4px;">Empty</div>`;
+  return div;
+}
+// Fills any remaining grid slots (up to 4 total) with faded empty placeholders.
+function _fillEmptyEnemySlots(grid,filledCount){
+  for(let i=filledCount+1;i<=4;i++){grid.appendChild(_buildEmptyEnemyCard(i));}
+}
 // ── PARTY SLOT RENDERING ─────────────────────────────────────────────────
 // Reads STATE.party (array of {username, charName} set when party system is built).
 // Grays out slot and shows "Offline" if member is not online.
@@ -12112,9 +12124,11 @@ function renderCombatUI(){
     const _nextAlive=enemies.find(e=>e.isAlive);
     STATE.targetUid=_nextAlive?_nextAlive.uid:null;
   }
-  if(grid.children.length!==enemies.length){
+  if(grid.dataset.enemyCount!==String(enemies.length)){
     grid.innerHTML="";
     enemies.forEach(e=>{grid.appendChild(_buildEnemyCard(e));STATE.prevEnemyHp[e.uid]=e.hp;});
+    _fillEmptyEnemySlots(grid,enemies.length);
+    grid.dataset.enemyCount=String(enemies.length);
   } else {
     enemies.forEach((e,i)=>{
       const card=grid.children[i];if(!card)return;
@@ -12388,9 +12402,11 @@ function _replayVisualEvent(ev){
 function _ensureEnemyGrid(){
   const grid=el("enemy-grid");
   const enemies=STATE.combatEnemies||[];
-  if(grid.children.length!==enemies.length){
+  if(grid.dataset.enemyCount!==String(enemies.length)){
     grid.innerHTML="";
     enemies.forEach(e=>{grid.appendChild(_buildEnemyCard(e));STATE.prevEnemyHp[e.uid]=e.hp;});
+    _fillEmptyEnemySlots(grid,enemies.length);
+    grid.dataset.enemyCount=String(enemies.length);
   }
 }
 
@@ -14011,7 +14027,7 @@ function _handlePartyWsMessage(msg){
       // Server sends authoritative member + enemy lists — always reset stale state first
       STATE.prevEnemyHp={};
       STATE.targetUid=null;
-      const _eg=el("enemy-grid");if(_eg)_eg.innerHTML="";
+      const _eg=el("enemy-grid");if(_eg){_eg.innerHTML="";_eg.dataset.enemyCount="";}
       if(msg.enemies){
         STATE.combatEnemies=msg.enemies.map(e=>_normEnemy(e,null));
         // Set target to first alive enemy
@@ -14077,7 +14093,7 @@ function _handlePartyWsMessage(msg){
         STATE._combatSeenSeq=0;
         STATE._combatSeenEvSeq=0;
         // Force a full enemy grid rebuild by clearing it before renderCombatUI
-        const _lvlGrid=el("enemy-grid");if(_lvlGrid)_lvlGrid.innerHTML="";
+        const _lvlGrid=el("enemy-grid");if(_lvlGrid){_lvlGrid.innerHTML="";_lvlGrid.dataset.enemyCount="";}
         // Dismiss transition first, then render combat UI so players never see
         // the combat screen appear behind/through the level transition overlay
         _dismissCombatTransition(()=>{STATE._combatTransitioning=false;renderCombatUI();_scrollActiveLogToBottom();});
@@ -17226,7 +17242,7 @@ function renderMapTab(content){
   function buildZoneRow(z){
     const isCurrent=z.id===cur.id;
     if(isCurrent){
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid #1a1a1a;">
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #1a1a1a;">
         <div>
           <div style="font-size:11px;color:#aaa;">${z.name}</div>
           <div style="font-size:9px;color:${z.safe?"#55dd55":"#dd5555"};margin-top:2px;">${z.safe?"Safe zone":"Danger zone"}</div>
@@ -18043,7 +18059,7 @@ function renderPartySection(){
   const isLeader=_isPartyLeader();
   const accts=DB.getAccountsCache();
   const _iq=STATE._arenaQueue||false;
-  let html=`<div class="sblock"><div class="sblock-head" style="display:flex;justify-content:space-between;align-items:center;">PARTY${(!inParty||isLeader)?(_iq?`<button class="link-btn" style="color:#333;font-size:10px;border:1px solid #222;padding:2px 8px;border-radius:3px;background:#000;font-family:'Courier New',monospace;pointer-events:none;">Invite</button>`:`<button class="link-btn" id="party-invite-btn" style="color:#aaa;font-size:10px;border:1px solid #333;padding:2px 8px;border-radius:3px;background:#000;font-family:'Courier New',monospace;">Invite</button>`):``}</div><div class="sblock-body">`;
+  let html=`<div class="sblock"><div class="sblock-head" style="display:flex;justify-content:space-between;align-items:center;">PARTY${(!inParty||isLeader)?(_iq?`<button class="link-btn" style="color:#333;font-size:10px;border:1px solid #222;padding:1px 8px;border-radius:3px;background:#000;font-family:'Courier New',monospace;pointer-events:none;">Invite</button>`:`<button class="link-btn" id="party-invite-btn" style="color:#aaa;font-size:10px;border:1px solid #333;padding:1px 8px;border-radius:3px;background:#000;font-family:'Courier New',monospace;">Invite</button>`):``}</div><div class="sblock-body">`;
 
   // Helper: build an HP bar HTML string
   function _hpBar(hp,maxHp){
