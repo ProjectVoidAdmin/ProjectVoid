@@ -21672,21 +21672,37 @@ document.addEventListener("selectionchange",()=>{
   let baseH = lockedH;
   const KEYBOARD_THRESHOLD = 100; // px - changes smaller than this are chrome show/hide, not keyboard
 
+  let _settleTimer=null;
   if(window.visualViewport){
     window.visualViewport.addEventListener('resize', ()=>{
       const newH = window.visualViewport.height;
       const delta = newH - baseH;
       if(delta > KEYBOARD_THRESHOLD){
         // Height grew a lot = keyboard closed or orientation change, update lock
+        if(_settleTimer){clearTimeout(_settleTimer);_settleTimer=null;}
         baseH = newH;
         applyHeight(newH);
       } else if(delta < -KEYBOARD_THRESHOLD){
-        // Height shrank a lot = keyboard opened, do NOT resize layout
-        // just keep current locked height
+        // Height shrank a lot = keyboard opened, do NOT resize layout.
+        // Also cancel any pending settle-update below, so a keyboard opening
+        // mid-flicker can't get overwritten by a stale small-change update.
+        if(_settleTimer){clearTimeout(_settleTimer);_settleTimer=null;}
       } else {
-        // Small change (browser chrome hide/show) - follow it
-        baseH = newH;
-        applyHeight(newH);
+        // Small change - this app is always fullscreen/standalone, so there's
+        // no browser chrome to track; a small delta here is just the status/
+        // nav bar flickering as the system UI briefly shows during a swipe.
+        // Reacting to every one of these caused the background/UI to bounce.
+        // Instead, wait for the flicker to stop, then apply once - this still
+        // corrects to the real settled height (so no stale black strip) but
+        // doesn't visibly jump around while the bar is mid-flicker.
+        if(_settleTimer)clearTimeout(_settleTimer);
+        _settleTimer=setTimeout(()=>{
+          _settleTimer=null;
+          const settledH=window.visualViewport.height;
+          if(Math.abs(settledH-baseH)< (KEYBOARD_THRESHOLD*-1)) return; // keyboard opened during the wait, leave it
+          baseH=settledH;
+          applyHeight(settledH);
+        },300);
       }
     }, {passive:true});
   }
