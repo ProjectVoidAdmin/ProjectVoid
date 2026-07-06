@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="theme-color" content="#000000"/>
 <meta name="color-scheme" content="dark"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-visual, viewport-fit=cover"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-visual"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
@@ -1301,7 +1301,6 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 </style>
 </head>
 <body>
-<div id="_topNotchGuard" style="display:none;position:fixed;top:0;left:0;right:0;height:max(env(safe-area-inset-top,0px),28px);background:#000;z-index:1000000;pointer-events:none;"></div>
 <script>
 // ── Auto-fullscreen on entry ─────────────────────────────────────────────
 // Chrome/Android carries the "user activation" from the Enter button tap
@@ -2276,21 +2275,19 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
     }catch(e){}
   }
   window._lockPortrait=_lockPortrait;
-  function _isDisplayModeFullscreen(){
-    // Only the manifest's "fullscreen" display mode means the OS itself has already
-    // hidden the status/nav bars (with swipe-to-reveal-as-overlay handled natively).
-    // "standalone" still shows both system bars, so it must NOT be treated as already
-    // fullscreen - that was the bug keeping the nav bar visible after install.
-    return window.matchMedia("(display-mode: fullscreen)").matches;
+  function _isInstalledDisplayMode(){
+    // An installed PWA can launch in either display mode depending on platform/manifest;
+    // both mean there's no browser chrome and no Fullscreen-API-driven state to check.
+    return window.matchMedia("(display-mode: standalone)").matches||window.matchMedia("(display-mode: fullscreen)").matches;
   }
   function _isFsActive(){
-    return !!(document.fullscreenElement||document.webkitFullscreenElement)||_isDisplayModeFullscreen();
+    return !!(document.fullscreenElement||document.webkitFullscreenElement)||_isInstalledDisplayMode();
   }
   function _forceFullscreen(){
     var _dlOv=document.getElementById("devlog-overlay");
     if(_dlOv&&_dlOv.style.display!=="none")return false;
     if(document.fullscreenElement||document.webkitFullscreenElement){_lockPortrait();return false;}
-    if(_isDisplayModeFullscreen()){_lockPortrait();return false;}
+    if(_isInstalledDisplayMode()){_lockPortrait();return false;}
     var el=document.documentElement;
     if(el.requestFullscreen){el.requestFullscreen({navigationUI:"hide"}).then(_lockPortrait).catch(function(){});return true;}
     else if(el.webkitRequestFullscreen){el.webkitRequestFullscreen();return true;}
@@ -4309,12 +4306,6 @@ function showScreen(id){
   if(!_screens)_screens=Array.from(document.querySelectorAll(".screen"));
   _screens.forEach(s=>s.classList.remove("active"));
   el(id).classList.add("active");
-  // Notch/status-bar guard strip: only shown once past the launch (login/create) flow,
-  // so the login and account-creation screens keep their original full-bleed art at the top.
-  const _notchGuard=document.getElementById("_topNotchGuard");
-  if(_notchGuard){
-    _notchGuard.style.display=(id==="login-screen"||id==="create-screen")?"none":"block";
-  }
   // Login screen background music: play while login-screen is active, stop otherwise.
   const _bgm=_pvBgm("login-bgm");
   if(_bgm){
