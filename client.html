@@ -123,7 +123,11 @@ input{font-family:'Courier New',monospace;}
 #stats-btn:active,#stats-btn:focus,#stats-btn:focus-visible{background:none!important;outline:none!important;}
 #stats-btn *{pointer-events:none;}
 /* Log */
-#log-area{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden;}
+/* The log box's height is capped at a maximum of 1:1 (square) — it never grows
+   taller than it is wide — but it's free to be shorter than that when there's
+   less content. min(100vw,430px) mirrors #app's own width formula exactly, so
+   the cap always matches the log box's actual rendered width. */
+#log-area{flex-shrink:0;width:100%;max-height:min(100vw,430px);box-sizing:border-box;display:flex;flex-direction:column;min-height:0;overflow:hidden;}
 .log-line{font-size:12px;line-height:1.6;padding:1px 0;}
 /* Chat */
 #chat-bar{flex-shrink:0;padding:4px 14px;display:flex;gap:6px;align-items:center;}
@@ -140,12 +144,18 @@ input{font-family:'Courier New',monospace;}
 #chat-input.log-only-disabled{border-color:#222!important;}
 #chat-input.log-only-disabled .vfield-placeholder{color:#3a3a3a!important;}
 #chat-send.log-only-disabled{color:#3a3a3a!important;border-color:#222!important;}
-/* Combat UI block: wraps status-block/player-bars/action-grid. min-height matches
-   #world-nav's height exactly so #log-area (flex:1) — and therefore #chat-bar, which
-   sits directly below it — occupies the same space whether in or out of combat. */
-#combat-ui-block{flex-shrink:1;display:none;flex-direction:column;min-height:min(269px,42vh);}
+/* Combat UI block: wraps status-block/player-bars/action-grid. Now takes over the
+   flex:1 "fill remaining space" role that #log-area used to have, so the enemy
+   grid (first child, right under #chat-bar) rides up with the square log box,
+   while #player-bars/#action-grid stay pinned to the bottom of the screen via
+   #player-bars's margin-top:auto below. */
+#combat-ui-block{flex:1;display:none;flex-direction:column;min-height:min(269px,42vh);}
 /* Status block (combat) */
 #status-block{flex-shrink:1;padding:6px 14px 4px;display:none;min-height:0;}
+/* Pushes player-bars (and action-grid after it) down to the bottom of
+   #combat-ui-block, keeping their screen position unchanged while only the
+   enemy grid above moves up to sit under the (now square) log box. */
+#player-bars{margin-top:auto;}
 #enemy-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:6px;}
 .enemy-card{border:1px solid #661111;border-radius:4px;padding:5px 6px;background:#000;cursor:pointer;text-align:center;min-width:0;position:relative;overflow:hidden;height:min(44px,7vh);box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;}
 .enemy-card.targeted{border:2px solid #ff2222;}
@@ -1815,11 +1825,10 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
     <button id="chat-send">Send</button>
   </div>
 
-  <!-- Combat UI block: wraps enemy grid, player bars, and action grid so their combined
-       height can be pinned to match world-nav's height (min(269px,42vh)). Without this,
-       the combat block's natural content height differs from world-nav's fixed height,
-       so #log-area (flex:1) ends up a different size in/out of combat, and #chat-bar
-       (which sits directly below #log-area) visibly shifts position between the two. -->
+  <!-- Combat UI block: wraps enemy grid, player bars, and action grid. It is flex:1 so it
+       fills the space below #chat-bar the same way #log-area used to — the enemy grid
+       (first child) sits right under #chat-bar, while #player-bars gets margin-top:auto
+       to stay pinned to the bottom of the screen. -->
   <div id="combat-ui-block" style="display:none;">
   <!-- Status (combat only - enemy grid) -->
   <div id="status-block">
