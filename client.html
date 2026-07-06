@@ -21621,13 +21621,11 @@ document.addEventListener("selectionchange",()=>{
         // Height grew a lot = keyboard closed or orientation change, update lock
         baseH = newH;
         applyHeight(newH);
-      } else if(delta < -KEYBOARD_THRESHOLD){
-        // Height shrank a lot = keyboard opened, do NOT resize layout
-        // just keep current locked height
       } else {
-        // Small change (browser chrome hide/show) - follow it
-        baseH = newH;
-        applyHeight(newH);
+        // Small change (nav-bar swipe-reveal, keyboard, or other transient system
+        // UI) - do NOT resize layout. The nav bar is meant to overlay on top of
+        // the app, not push/shrink it, so we deliberately ignore small deltas
+        // in both directions and keep the locked height exactly as-is.
       }
     }, {passive:true});
   }
