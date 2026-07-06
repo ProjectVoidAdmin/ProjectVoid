@@ -2,7 +2,7 @@
   "name": "Project Void",
   "short_name": "Project Void",
   "start_url": "./index.html",
-  "display": "fullscreen",
+  "display": "standalone",
   "orientation": "portrait",
   "background_color": "#000000",
   "theme_color": "#000000",
