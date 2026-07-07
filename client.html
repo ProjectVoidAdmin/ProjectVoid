@@ -6,6 +6,7 @@
 <meta name="color-scheme" content="dark"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-visual, viewport-fit=cover"/>
 <meta name="display" content="fullscreen"/>
+<link rel="manifest" href="manifest.json"/>
 <link rel="icon" sizes="192x192" href="icon-192.png"/>
 <link rel="icon" sizes="512x512" href="icon-512.png"/>
 <link rel="apple-touch-icon" sizes="180x180" href="icon-192.png"/>
@@ -4410,6 +4411,7 @@ const LOGIN_BG_IMAGE="background/Login.png";
 // ========================================
 let _screens=null;
 function showScreen(id){
+  if(typeof window._lockPortrait==="function")window._lockPortrait();
   if(!_screens)_screens=Array.from(document.querySelectorAll(".screen"));
   _screens.forEach(s=>s.classList.remove("active"));
   el(id).classList.add("active");
@@ -21825,6 +21827,7 @@ document.addEventListener("selectionchange",()=>{
   }
 
   window.addEventListener('orientationchange', ()=>{
+    if(typeof window._lockPortrait==="function")window._lockPortrait();
     setTimeout(()=>{
       const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
       baseH = h;
