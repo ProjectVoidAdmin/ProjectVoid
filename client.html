@@ -130,7 +130,7 @@ input{font-family:'Courier New',monospace;}
 #log-area{flex-shrink:0;width:100%;max-height:min(100vw,430px);box-sizing:border-box;display:flex;flex-direction:column;min-height:0;overflow:hidden;}
 .log-line{font-size:12px;line-height:1.6;padding:1px 0;}
 /* Chat */
-#chat-bar{flex-shrink:0;padding:4px 14px;display:flex;gap:6px;align-items:center;}
+#chat-bar{flex-shrink:0;padding:6px 14px;display:flex;gap:6px;align-items:center;background:rgba(0,0,0,0.85);border-top:1px solid #666;}
 /* vfield-inline: compact single-line variant for chat bar, friend input etc */
 .vfield-inline{min-height:32px;padding:5px 8px;font-size:11px;margin-bottom:0;line-height:1.4;display:flex;align-items:center;}
 #chat-input{flex:1;}
@@ -1822,12 +1822,14 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
     <div id="log-system" class="log-panel" style="flex:0 1 auto;max-height:100%;overflow-y:auto;display:none;flex-direction:column;touch-action:pan-y;"></div>
     <div id="log-combat" class="log-panel" style="flex:0 1 auto;max-height:100%;overflow-y:auto;display:none;flex-direction:column;touch-action:pan-y;"></div>
     <div id="log-loot" class="log-panel" style="flex:0 1 auto;max-height:100%;overflow-y:auto;display:none;flex-direction:column;touch-action:pan-y;"></div>
-  </div>
 
-  <!-- Chat bar: bottom of log, above nav tabs (out of combat) or above enemy cards (in combat) -->
-  <div id="chat-bar">
-    <div id="chat-input" class="vfield vfield-inline" data-vfield="chat" data-placeholder="Zone chat..."></div>
-    <button id="chat-send">Send</button>
+    <!-- Chat bar: now lives inside #log-area itself, as the last flex child, so it
+         sits pinned to the bottom of the chat box (not scrolling with messages)
+         while remaining visually inside the same bordered/backgrounded box. -->
+    <div id="chat-bar">
+      <div id="chat-input" class="vfield vfield-inline" data-vfield="chat" data-placeholder="Zone chat..."></div>
+      <button id="chat-send">Send</button>
+    </div>
   </div>
 
   <!-- Combat UI block: wraps enemy grid, player bars, and action grid. It is flex:1 so it
