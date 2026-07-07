@@ -1820,6 +1820,14 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
       <button id="log-tab-combat" style="flex:1;padding:5px 2px;background:#000;border:none;color:#555;font-size:9px;letter-spacing:1px;font-family:'Courier New',monospace;">COMBAT</button>
       <button id="log-tab-loot" style="flex:1;padding:5px 2px;background:#000;border:none;color:#555;font-size:9px;letter-spacing:1px;font-family:'Courier New',monospace;">LOOT</button>
     </div>
+    <!-- Chat bar: now lives inside #log-area itself, as the first flex child (right
+         after the tab row), so it stays pinned at the top of the chat box while the
+         log panels follow after it and grow downward as messages come in. -->
+    <div id="chat-bar">
+      <div id="chat-input" class="vfield vfield-inline" data-vfield="chat" data-placeholder="Zone chat..."></div>
+      <button id="chat-send">Send</button>
+    </div>
+
     <div id="log-chat" class="log-panel" style="flex:0 1 auto;max-height:288px;overflow-y:auto;display:flex;flex-direction:column;touch-action:pan-y;"></div>
     <div id="log-party" class="log-panel" style="flex:0 1 auto;max-height:288px;overflow-y:auto;display:none;flex-direction:column;touch-action:pan-y;"></div>
     <div id="log-guild" class="log-panel" style="flex:0 1 auto;max-height:288px;overflow-y:auto;display:none;flex-direction:column;touch-action:pan-y;"></div>
@@ -1827,14 +1835,6 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
     <div id="log-system" class="log-panel" style="flex:0 1 auto;max-height:288px;overflow-y:auto;display:none;flex-direction:column;touch-action:pan-y;"></div>
     <div id="log-combat" class="log-panel" style="flex:0 1 auto;max-height:288px;overflow-y:auto;display:none;flex-direction:column;touch-action:pan-y;"></div>
     <div id="log-loot" class="log-panel" style="flex:0 1 auto;max-height:288px;overflow-y:auto;display:none;flex-direction:column;touch-action:pan-y;"></div>
-
-    <!-- Chat bar: now lives inside #log-area itself, as the last flex child, so it
-         sits pinned to the bottom of the chat box (not scrolling with messages)
-         while remaining visually inside the same bordered/backgrounded box. -->
-    <div id="chat-bar">
-      <div id="chat-input" class="vfield vfield-inline" data-vfield="chat" data-placeholder="Zone chat..."></div>
-      <button id="chat-send">Send</button>
-    </div>
   </div>
 
   <!-- Combat UI block: wraps enemy grid, player bars, and action grid. It is flex:1 so it
