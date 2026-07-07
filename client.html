@@ -50,12 +50,20 @@ input{font-family:'Courier New',monospace;}
    by any flex quirk in a parent (nested % heights, old WebView flex bugs,
    etc) the way justify-content:flex-end theoretically could be — it's the
    exact same bottom:0-style anchoring #vkb already uses elsewhere in this
-   file. background-size:cover always fills #login-screen edge to edge, so
-   "bottom of the background" == "bottom of #login-screen", and a fixed
-   distance from that edge is all that's needed to keep the Create Account
-   button lined up with it on every device. */
+   file.
+
+   The bottom offset itself reuses --vkb-h (the same custom property the
+   on-screen keyboard sizes itself with). --vkb-h is computed in JS by
+   measureNavTopOffscreen(), which off-screen-renders the real #tab-bar
+   (since it doesn't otherwise exist on the login screen) and measures the
+   live gap between its top edge and the bottom of the viewport — i.e. the
+   point where the opaque nav UI (and therefore the visible background art)
+   ends on the real in-game screen. Reusing that exact measured value here,
+   instead of a fixed px guess or a duplicated CSS formula, is what keeps
+   the Create Account button's bottom edge flush with the same boundary the
+   keyboard's top edge already lines up with, on every device. */
 #login-screen{align-items:center;justify-content:center;background:#000;background-size:cover;background-position:center;background-repeat:no-repeat;overflow:hidden;position:relative;}
-.login-box{width:100%;max-width:360px;position:absolute;left:50%;bottom:32px;transform:translateX(-50%);z-index:2;transition:none;}
+.login-box{width:100%;max-width:360px;position:absolute;left:50%;bottom:var(--vkb-h, 32px);transform:translateX(-50%);z-index:2;transition:none;}
 #li-scanline,#ci-scanline{display:none;}
 #li-title{font-size:32px;font-weight:bold;letter-spacing:8px;color:#fff;font-family:'Courier New',monospace;text-align:center;opacity:0;animation:ci-flicker 1.4s ease 0.3s forwards,ci-glow 4s ease 1.8s infinite,ci-glitch 9s ease 2.5s infinite;line-height:1.15;}
 #li-sub{font-size:9px;letter-spacing:5px;color:#444;font-family:'Courier New',monospace;text-align:center;opacity:0;animation:ci-fadein 0.8s ease 1.8s forwards,ci-glitch2 11s ease 4s infinite;margin-top:4px;margin-bottom:0;}
