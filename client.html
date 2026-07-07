@@ -204,7 +204,7 @@ input{font-family:'Courier New',monospace;}
 #world-nav{flex:1;display:none;flex-direction:column;min-height:min(269px,42vh);overflow:hidden;}
 .tab-btn{flex:0 1 auto;min-width:0;padding:6px;background:#000;border:none;color:#aaa;font-size:10px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:0;text-align:center;white-space:nowrap;line-height:normal;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent!important;-webkit-touch-callout:none;}
 .log-panel{padding:0 14px;}
-.log-panel:not(:empty){padding:6px 14px 2px;background:rgba(0,0,0,0.6);}
+.log-panel:not(:empty){padding:0 14px;background:rgba(0,0,0,0.6);}
 .tab-btn:active,.tab-btn:focus,.tab-btn:focus-visible{background:#000!important;outline:none!important;-webkit-tap-highlight-color:transparent!important;}
 .tab-btn.active{color:#fff;}
 .tab-content{padding:10px 14px 16px;flex:1;overflow-y:auto;min-height:0;touch-action:pan-y;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;}
@@ -1807,7 +1807,7 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 
   <!-- Log area with General/Party/Guild/Combat tabs -->
   <div id="log-area" style="flex:0 0 auto;display:flex;flex-direction:column;min-height:0;">
-    <div style="display:flex;flex-shrink:0;border-bottom:1px solid #222;">
+    <div style="display:flex;flex-shrink:0;border-bottom:1px solid #222;margin-bottom:4px;">
       <button id="log-tab-chat" style="flex:1;padding:5px 2px;background:#000;border:none;color:#fff;font-size:9px;letter-spacing:1px;font-family:'Courier New',monospace;">ZONE</button>
       <button id="log-tab-party" style="flex:1;padding:5px 2px;background:#000;border:none;color:#555;font-size:9px;letter-spacing:1px;font-family:'Courier New',monospace;">PARTY</button>
       <button id="log-tab-guild" style="flex:1;padding:5px 2px;background:#000;border:none;color:#555;font-size:9px;letter-spacing:1px;font-family:'Courier New',monospace;">GUILD</button>
@@ -1815,13 +1815,13 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
       <button id="log-tab-combat" style="flex:1;padding:5px 2px;background:#000;border:none;color:#555;font-size:9px;letter-spacing:1px;font-family:'Courier New',monospace;">COMBAT</button>
       <button id="log-tab-loot" style="flex:1;padding:5px 2px;background:#000;border:none;color:#555;font-size:9px;letter-spacing:1px;font-family:'Courier New',monospace;">LOOT</button>
     </div>
-    <div id="log-chat" class="log-panel" style="flex:0 1 auto;max-height:100%;overflow-y:auto;display:flex;flex-direction:column;touch-action:pan-y;"></div>
-    <div id="log-party" class="log-panel" style="flex:0 1 auto;max-height:100%;overflow-y:auto;display:none;flex-direction:column;touch-action:pan-y;"></div>
-    <div id="log-guild" class="log-panel" style="flex:0 1 auto;max-height:100%;overflow-y:auto;display:none;flex-direction:column;touch-action:pan-y;"></div>
-    <div id="log-dm" class="log-panel" style="flex:0 1 auto;max-height:100%;overflow-y:auto;display:none;flex-direction:column;touch-action:pan-y;"></div>
-    <div id="log-system" class="log-panel" style="flex:0 1 auto;max-height:100%;overflow-y:auto;display:none;flex-direction:column;touch-action:pan-y;"></div>
-    <div id="log-combat" class="log-panel" style="flex:0 1 auto;max-height:100%;overflow-y:auto;display:none;flex-direction:column;touch-action:pan-y;"></div>
-    <div id="log-loot" class="log-panel" style="flex:0 1 auto;max-height:100%;overflow-y:auto;display:none;flex-direction:column;touch-action:pan-y;"></div>
+    <div id="log-chat" class="log-panel" style="flex:0 1 auto;max-height:288px;overflow-y:auto;display:flex;flex-direction:column;touch-action:pan-y;"></div>
+    <div id="log-party" class="log-panel" style="flex:0 1 auto;max-height:288px;overflow-y:auto;display:none;flex-direction:column;touch-action:pan-y;"></div>
+    <div id="log-guild" class="log-panel" style="flex:0 1 auto;max-height:288px;overflow-y:auto;display:none;flex-direction:column;touch-action:pan-y;"></div>
+    <div id="log-dm" class="log-panel" style="flex:0 1 auto;max-height:288px;overflow-y:auto;display:none;flex-direction:column;touch-action:pan-y;"></div>
+    <div id="log-system" class="log-panel" style="flex:0 1 auto;max-height:288px;overflow-y:auto;display:none;flex-direction:column;touch-action:pan-y;"></div>
+    <div id="log-combat" class="log-panel" style="flex:0 1 auto;max-height:288px;overflow-y:auto;display:none;flex-direction:column;touch-action:pan-y;"></div>
+    <div id="log-loot" class="log-panel" style="flex:0 1 auto;max-height:288px;overflow-y:auto;display:none;flex-direction:column;touch-action:pan-y;"></div>
 
     <!-- Chat bar: now lives inside #log-area itself, as the last flex child, so it
          sits pinned to the bottom of the chat box (not scrolling with messages)
