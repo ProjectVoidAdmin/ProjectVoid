@@ -18202,7 +18202,6 @@ function renderSheetTab(content){
   accs.forEach((acc,i)=>{
     html+=`<div class="srow"><span class="srow-l">Accessory ${i+1}:</span><span class="srow-v" style="color:${acc?'#aaa':'#444'};font-size:11px;">${acc?acc.name:"None"}</span></div>`;
   });
-  html+=`<div style="font-size:9px;color:#444;letter-spacing:1px;margin-top:4px;padding-top:4px;border-top:1px solid #111;">Equip from BAG tab in a safe zone</div>`;
   html+=`</div></div>`;
   // Stats inline
   const stats=p.stats||{};
