@@ -71,13 +71,13 @@ input{font-family:'Courier New',monospace;}
 .vfield-placeholder{color:#444;display:inline;}
 @keyframes vcursor{0%,100%{opacity:1;}50%{opacity:0;}}
 /* ── KEYBOARD - completely static, never modified by JS ── */
-#vkb{position:fixed;bottom:0;left:0;right:0;max-width:430px;margin:0 auto;background:#222;border-top:1px solid #555;z-index:9000;padding:5px 4px 6px;transform:translateY(100%);transition:transform 0.22s ease;will-change:transform;height:calc(min(269px,42vh) - var(--nav-drop))!important;min-height:calc(min(269px,42vh) - var(--nav-drop))!important;max-height:calc(min(269px,42vh) - var(--nav-drop))!important;box-sizing:border-box;display:flex!important;flex-direction:column;}
+#vkb{position:fixed;bottom:0;left:0;right:0;max-width:430px;margin:0 auto;background:#222;border-top:1px solid #555;z-index:9000;padding:5px 4px 6px;transform:translateY(100%);transition:transform 0.22s ease;will-change:transform;height:var(--vkb-h,min(269px,42vh))!important;min-height:var(--vkb-h,min(269px,42vh))!important;max-height:var(--vkb-h,min(269px,42vh))!important;box-sizing:border-box;display:flex!important;flex-direction:column;}
 #vkb.show{transform:translateY(0);}
 /* Both row containers fill the keyboard height as a flex column */
 #vkb-main-rows{flex:1;display:flex;flex-direction:column;gap:3px;min-height:0;}
 #vkb-sym-rows{flex:none;display:flex;flex-direction:column;gap:3px;min-height:0;margin-top:auto;}
 .vkb-row{flex:1;display:flex;justify-content:center;gap:4px;min-height:0;}
-#vkb-sym-rows .vkb-row{flex:none;height:calc((min(269px,42vh) - var(--nav-drop) - 23px) / 5);}
+#vkb-sym-rows .vkb-row{flex:none;height:calc((var(--vkb-h,min(269px,42vh)) - 23px) / 5);}
 .vkb-key{background:#3a3a3a;border:1px solid #666;border-bottom-width:2px;border-radius:5px;color:#fff;font-size:15px;font-family:'Courier New',monospace;padding:0;flex:1;max-width:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;transition:background 0.08s;}
 .vkb-key.wide{max-width:58px;font-size:11px;flex:1.6;}
 .vkb-key.space{max-width:999px;flex:5;}
@@ -847,7 +847,7 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 .dev-chain-atom select:focus,.dev-chain-atom input:focus{outline:none!important;border-color:#0077aa!important;}
 /* ── Admin Terminal ─────────────────────────────────────────────────────── */
 #admin-terminal{position:fixed;top:0;left:0;right:0;bottom:0;background:#000;z-index:9500;display:flex;flex-direction:column;font-family:'Courier New',monospace;transition:bottom 0.22s ease;will-change:bottom;overflow:hidden;}
-#admin-terminal.vkb-up{bottom:calc(min(269px,42vh) - var(--nav-drop));}
+#admin-terminal.vkb-up{bottom:var(--vkb-h,min(269px,42vh));}
 #admin-terminal-bar{background:#0a0a0a;border-bottom:1px solid #1a1a1a;padding:10px 12px;display:flex;align-items:center;gap:8px;flex-shrink:0;}
 #admin-terminal-title{color:#00ff88;font-size:clamp(9px,2.5vw,12px);letter-spacing:2px;flex:1;}
 #admin-terminal-close{background:#000;border:1px solid #555;color:#eee;font-size:clamp(10px,3vw,13px);padding:8px 16px;cursor:pointer;font-family:'Courier New',monospace;letter-spacing:1px;-webkit-tap-highlight-color:transparent;touch-action:manipulation;position:relative;z-index:9600;min-width:80px;min-height:40px;}
@@ -21802,6 +21802,21 @@ document.addEventListener("selectionchange",()=>{
     app.style.maxHeight = h + 'px';
   }
 
+  // Measures the actual live gap between the bottom of #log-area (= the top of
+  // the nav bar / combat enemy grid, since they're flush siblings) and the
+  // bottom of the viewport, and stores it as --vkb-h. The keyboard's CSS height
+  // reads this variable, so its top edge always lands exactly on the nav bar's
+  // top edge regardless of screen size, instead of relying on a guessed calc().
+  function updateVkbHeight(){
+    const la = document.getElementById('log-area');
+    if(!la) return;
+    const navTop = la.getBoundingClientRect().bottom;
+    const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const vkbH = Math.max(0, vh - navTop);
+    if(vkbH > 0) root.style.setProperty('--vkb-h', vkbH + 'px');
+  }
+  window._pvUpdateVkbHeight = updateVkbHeight;
+
   // At load, use visualViewport.height which respects browser chrome correctly
   // Don't use screen.height (too large) or screen.availHeight (includes nav bars)
   function getInitialHeight(){
@@ -21811,6 +21826,9 @@ document.addEventListener("selectionchange",()=>{
 
   const lockedH = getInitialHeight();
   applyHeight(lockedH);
+  // Measure after layout settles (fonts/images can shift log-area's rendered size)
+  requestAnimationFrame(updateVkbHeight);
+  setTimeout(updateVkbHeight, 300);
 
   // Track keyboard state: if height drops significantly = keyboard opened, ignore it
   let baseH = lockedH;
@@ -21824,6 +21842,7 @@ document.addEventListener("selectionchange",()=>{
         // Height grew a lot = keyboard closed or orientation change, update lock
         baseH = newH;
         applyHeight(newH);
+        updateVkbHeight();
       } else if(delta < -KEYBOARD_THRESHOLD){
         // Height shrank a lot = keyboard opened, do NOT resize layout
         // just keep current locked height
@@ -21831,6 +21850,7 @@ document.addEventListener("selectionchange",()=>{
         // Small change (browser chrome hide/show) - follow it
         baseH = newH;
         applyHeight(newH);
+        updateVkbHeight();
       }
     }, {passive:true});
   }
@@ -22225,6 +22245,7 @@ document.addEventListener("selectionchange",()=>{
   }
 
   function openKeyboard(f){
+    if(typeof window._pvUpdateVkbHeight==="function") window._pvUpdateVkbHeight();
     var alreadyOpen=vkbEl.classList.contains("show");
     if(activeField) activeField.el.classList.remove("active");
     activeField={el:f,key:f.dataset.vfield};
