@@ -21789,6 +21789,9 @@ document.addEventListener("selectionchange",()=>{
 (function(){
   const app = document.getElementById('app');
   const root = document.documentElement;
+  // Matches VKB_H used elsewhere (login/create slide calc) for screens that
+  // don't have a nav bar to measure against.
+  const VKB_FIXED_H = 190;
 
   // svh = small viewport height (excludes browser chrome, always the minimum)
   // This is already set via CSS (100svh). The JS lock below only handles
@@ -21815,27 +21818,43 @@ document.addEventListener("selectionchange",()=>{
   // Measuring the actual visible nav element directly removes that guesswork.
   function updateVkbHeight(){
     const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const gs = document.getElementById('game-screen');
     let navTop = null;
-    // Normal world view: the tab bar (Zone/Social/Character/Inventory/etc)
-    const tb = document.getElementById('tab-bar');
-    if(tb){
-      const r = tb.getBoundingClientRect();
-      if(r.height > 0) navTop = r.top;
-    }
-    // Combat view: the enemy grid sits where the tab bar would be
-    if(navTop === null){
-      const sb = document.getElementById('status-block');
-      if(sb){
-        const r = sb.getBoundingClientRect();
+    // Only trust nav-bar measurements while the game world screen is the one
+    // actually on screen. On login/create-account/popups/dev-panel, #game-screen
+    // (and everything inside it, including #log-area) is display:none, so any
+    // rect read from it collapses to 0 — which previously made navTop land at
+    // 0 and the keyboard stretch to cover the entire viewport.
+    if(gs && gs.classList.contains('active')){
+      // Normal world view: the tab bar (Zone/Social/Character/Inventory/etc)
+      const tb = document.getElementById('tab-bar');
+      if(tb){
+        const r = tb.getBoundingClientRect();
         if(r.height > 0) navTop = r.top;
       }
+      // Combat view: the enemy grid sits where the tab bar would be
+      if(navTop === null){
+        const sb = document.getElementById('status-block');
+        if(sb){
+          const r = sb.getBoundingClientRect();
+          if(r.height > 0) navTop = r.top;
+        }
+      }
+      // Fallback within the game screen if neither of the above rendered yet
+      if(navTop === null){
+        const la = document.getElementById('log-area');
+        if(la){
+          const b = la.getBoundingClientRect().bottom;
+          if(b > 0) navTop = b;
+        }
+      }
     }
-    // Fallback for screens with neither (login/dev-panel/popups): old proxy
     if(navTop === null){
-      const la = document.getElementById('log-area');
-      if(la) navTop = la.getBoundingClientRect().bottom;
+      // Not in the game world — use the fixed keyboard height instead of
+      // measuring a nav bar that isn't actually on screen.
+      root.style.setProperty('--vkb-h', VKB_FIXED_H + 'px');
+      return;
     }
-    if(navTop === null) return;
     const vkbH = Math.max(0, vh - navTop);
     if(vkbH > 0) root.style.setProperty('--vkb-h', vkbH + 'px');
   }
