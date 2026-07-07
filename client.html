@@ -20226,6 +20226,7 @@ function setupLogin(){
       _authUsername=uname;
       const newEntry={uid:authRes.uid,created:Date.now()};
       DB.saveAccount(uname,newEntry);
+      _flashPwBorderGreen();
       // Authenticate the WS session with the new token before loading save data
       await _wsRequest({type:"auth",token:_authToken,deviceId:_deviceId,fingerprint:_fingerprint,clientVersion:CLIENT_VERSION},"auth_ok",null,5000);
       saveRemember(uname);
