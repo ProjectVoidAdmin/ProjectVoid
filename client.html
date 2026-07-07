@@ -21802,16 +21802,40 @@ document.addEventListener("selectionchange",()=>{
     app.style.maxHeight = h + 'px';
   }
 
-  // Measures the actual live gap between the bottom of #log-area (= the top of
-  // the nav bar / combat enemy grid, since they're flush siblings) and the
-  // bottom of the viewport, and stores it as --vkb-h. The keyboard's CSS height
-  // reads this variable, so its top edge always lands exactly on the nav bar's
-  // top edge regardless of screen size, instead of relying on a guessed calc().
+  // Measures the actual live gap between the top of the currently-visible nav
+  // element and the bottom of the viewport, and stores it as --vkb-h. The
+  // keyboard's CSS height reads this variable, so its top edge always lands
+  // exactly on the nav bar's top edge regardless of screen size.
+  //
+  // Previously this measured #log-area's bottom edge as a proxy for the nav
+  // bar's top edge (assuming they were flush siblings). That proxy silently
+  // drifted from the truth: #tab-bar carries its own 2px top margin that its
+  // parent #world-nav doesn't have, so the keyboard always sat ~2px too low
+  // (and any future layout change to that region would reintroduce drift).
+  // Measuring the actual visible nav element directly removes that guesswork.
   function updateVkbHeight(){
-    const la = document.getElementById('log-area');
-    if(!la) return;
-    const navTop = la.getBoundingClientRect().bottom;
     const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    let navTop = null;
+    // Normal world view: the tab bar (Zone/Social/Character/Inventory/etc)
+    const tb = document.getElementById('tab-bar');
+    if(tb){
+      const r = tb.getBoundingClientRect();
+      if(r.height > 0) navTop = r.top;
+    }
+    // Combat view: the enemy grid sits where the tab bar would be
+    if(navTop === null){
+      const sb = document.getElementById('status-block');
+      if(sb){
+        const r = sb.getBoundingClientRect();
+        if(r.height > 0) navTop = r.top;
+      }
+    }
+    // Fallback for screens with neither (login/dev-panel/popups): old proxy
+    if(navTop === null){
+      const la = document.getElementById('log-area');
+      if(la) navTop = la.getBoundingClientRect().bottom;
+    }
+    if(navTop === null) return;
     const vkbH = Math.max(0, vh - navTop);
     if(vkbH > 0) root.style.setProperty('--vkb-h', vkbH + 'px');
   }
