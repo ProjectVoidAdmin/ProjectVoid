@@ -20100,15 +20100,17 @@ function setupLogin(){
   function setVal(id,v){if(window._vkbSetVal)window._vkbSetVal(id,v);else if(el(id))el(id).value=v;}
   function setMode(mode){
     loginMode=mode;
+    window._pvLoginMode=mode;
     el("li-sub").textContent=mode==="login"?"SIGN IN":"CREATE ACCOUNT";
     submitBtn.textContent=mode==="login"?"SIGN IN":"CREATE ACCOUNT";
     toggleBtn.textContent=mode==="login"?"Create New Account":"Back to Sign In";
-    pwConfirmWrap.style.display=mode==="register"?"block":"none";
+    pwConfirmWrap.style.display="none"; // confirm box stays hidden — pw field now handles its own two-step confirm
     el("login-err").style.display="none";
     el("login-ok").style.display="none";
     setVal("login-pw-confirm","");
     setVal("login-pw","");
     if(pwMatchHint)pwMatchHint.style.display="none";
+    if(window._pvResetPwConfirm) window._pvResetPwConfirm();
     // Clear validation border colors
     var _pwEl=el("login-pw");if(_pwEl)_pwEl.style.removeProperty("border-color");
     var _pwcEl=el("login-pw-confirm");if(_pwcEl)_pwcEl.style.removeProperty("border-color");
@@ -21894,6 +21896,18 @@ document.addEventListener("selectionchange",()=>{
   var CREATE_KEYS={"createname":1};
   var GAME_KEYS={"chat":1};
 
+  // Single-box password confirm (register mode): stage 0 = first entry,
+  // stage 1 = re-entry that must match. window._pvLoginMode is set by
+  // setupLogin()'s setMode() so this IIFE knows login vs register.
+  var pwConfirmStage=0, pwFirstEntry="";
+  window._pvResetPwConfirm=function(){
+    pwConfirmStage=0; pwFirstEntry="";
+    var f=document.getElementById("login-pw");
+    if(f) f.dataset.placeholder="Enter password";
+    var errEl=document.getElementById("login-err");
+    if(errEl) errEl.style.display="none";
+  };
+
   function getPlaceholder(f){return f.dataset.placeholder||"";}
   function getMaxLen(f){return parseInt(f.dataset.maxlen||"200",10);}
   function isPwField(key){return key==="pw"||key==="pwc"||key==="resetpw"||key==="resetpwc";}
@@ -22294,7 +22308,45 @@ document.addEventListener("selectionchange",()=>{
       setTimeout(function(){keyEl.classList.remove("pressed");},120);
       var k=keyEl.dataset.k;
       if(!k) return;
-      if(k==="DONE"){closeKeyboard();return;}
+      if(k==="DONE"){
+        if(activeField&&activeField.key==="pw"&&window._pvLoginMode==="register"){
+          var pwField=activeField.el;
+          var curVal=vals.pw||"";
+          if(pwConfirmStage===0){
+            if(curVal.length===0){return;} // nothing typed yet, ignore
+            pwFirstEntry=curVal;
+            pwConfirmStage=1;
+            vals.pw="";
+            pwField.dataset.placeholder="Re-enter password";
+            renderField(pwField);
+            return; // keep keyboard open for the re-entry
+          } else {
+            var _sameText=curVal.length>0&&curVal===pwFirstEntry;
+            var _matches=_sameText&&curVal.length>=6;
+            if(_matches){
+              vals.pwc=curVal; // keep pw as typed; mirror into pwc so existing submit validation passes
+              pwConfirmStage=0;
+              pwFirstEntry="";
+              pwField.dataset.placeholder="Enter password";
+              closeKeyboard();
+              return;
+            } else {
+              var errEl=document.getElementById("login-err");
+              if(errEl){
+                errEl.textContent=_sameText?"Password must be at least 6 characters":"Passwords didn't match — try again";
+                errEl.style.display="block";
+              }
+              vals.pw="";vals.pwc="";
+              pwConfirmStage=0;
+              pwFirstEntry="";
+              pwField.dataset.placeholder="Enter password";
+              renderField(pwField);
+              return; // keep keyboard open to retry
+            }
+          }
+        }
+        closeKeyboard();return;
+      }
       if(k==="BACK"){startBackHold();return;}
       if(k==="SHIFT"){vkbShift=!vkbShift;updateLayout();return;}
       if(k==="SYM"){vkbSym=!vkbSym;updateLayout();return;}
