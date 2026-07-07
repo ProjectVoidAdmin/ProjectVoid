@@ -1318,6 +1318,10 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 // invisible full-page tap-catcher guarantees it fires on the very first
 // real tap instead, then gets out of the way permanently.
 (function(){
+  var _pvNative=/[?&]pvapp=1(&|$)/.test(location.search);
+  if(_pvNative)return; // native app already renders fullscreen/edge-to-edge natively (ShowStatusBar/TitleVisible false in Screen1) -
+                        // calling requestFullscreen() here engages the WebView's own fullscreen handling, which resets
+                        // the Activity's locked portrait orientation. Skip it entirely in this context.
   function requestFs(){
     var el = document.documentElement;
     var req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
@@ -2297,6 +2301,7 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   }
   window._isFsActive=_isFsActive;
   function _forceFullscreen(){
+    if(_pvIsNativeApp){_lockPortrait();return false;}
     var _dlOv=document.getElementById("devlog-overlay");
     if(_dlOv&&_dlOv.style.display!=="none")return false;
     if(document.fullscreenElement||document.webkitFullscreenElement){_lockPortrait();return false;}
