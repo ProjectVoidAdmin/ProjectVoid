@@ -4221,7 +4221,7 @@ function addLog(type,text){
     if(chatMatch){
       const prefix=chatMatch[1],speakerName=chatMatch[2],chatMsg=chatMatch[3];
       const prefixSpan=document.createElement("span");
-      prefixSpan.textContent=`[${prefix}] `;
+      prefixSpan.textContent="";
       prefixSpan.style.cssText="font-size:11px;font-family:'Courier New',monospace;";
       const nameBtn=document.createElement("button");
       nameBtn.textContent=speakerName;
