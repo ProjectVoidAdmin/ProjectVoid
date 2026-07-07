@@ -20268,11 +20268,9 @@ function setupLogin(){
         const res=window._pvAdvancePwStage();
         if(res==="matched"){
           doSubmit();
-        } else {
-          el("login-err").textContent=(res==="tooshort")?"Password must be at least 6 characters":"Passwords didn't match — try again";
-          el("login-err").style.display="block";
-          _flashPwBorder();
         }
+        // "tooshort"/"mismatch" feedback is now shown inside the password
+        // box itself (its placeholder + red flash), so nothing else to do.
         return;
       }
     }
@@ -21969,9 +21967,22 @@ document.addEventListener("selectionchange",()=>{
         vals.pw="";vals.pwc="";
         pwConfirmStage=0;
         pwFirstEntry="";
-        pwField.dataset.placeholder="Enter password";
+        var _msg=_sameText?"Password must be at least 6 characters":"Passwords didn't match — try again";
+        pwField.dataset.placeholder=_msg;
         renderField(pwField);
         pvSyncSubmitLabel();
+        pwField.style.setProperty("border-color","#cc2020","important");
+        pwField.style.setProperty("box-shadow","0 0 0 1px #cc2020","important");
+        setTimeout(function(){
+          pwField.style.removeProperty("border-color");
+          pwField.style.removeProperty("box-shadow");
+          // Only revert the placeholder if the person hasn't started typing
+          // again and hasn't re-entered the confirm step in the meantime.
+          if((vals.pw||"").length===0&&pwConfirmStage===0){
+            pwField.dataset.placeholder="Enter password";
+            renderField(pwField);
+          }
+        },1400);
         return _sameText?"tooshort":"mismatch";
       }
     }
@@ -22391,12 +22402,8 @@ document.addEventListener("selectionchange",()=>{
           if(_res==="empty"){return;}
           if(_res==="advanced"){return;} // keep keyboard open for the re-entry
           if(_res==="matched"){closeKeyboard();return;}
-          // "tooshort" or "mismatch"
-          var errEl=document.getElementById("login-err");
-          if(errEl){
-            errEl.textContent=(_res==="tooshort")?"Password must be at least 6 characters":"Passwords didn't match — try again";
-            errEl.style.display="block";
-          }
+          // "tooshort"/"mismatch" feedback now shows inside the password
+          // box itself (its placeholder + red flash) — just keep retrying.
           return; // keep keyboard open to retry
         }
         closeKeyboard();return;
