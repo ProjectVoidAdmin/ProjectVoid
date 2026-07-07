@@ -44,16 +44,18 @@ input{font-family:'Courier New',monospace;}
 .screen{display:none!important;flex-direction:column;height:100%;overflow:hidden;min-height:0;}
 .screen.active{display:flex!important;}
 /* Login */
-/* Anchored to the bottom (not vertically centered) so the Create New
-   Account button's bottom edge always lands a fixed distance above the
-   bottom of the screen/background, regardless of device screen height or
-   aspect ratio. background-size:cover always fills the container edge to
-   edge, so "bottom of the background" == "bottom of #login-screen" — a
-   fixed padding-bottom here is all that's needed to keep them lined up on
-   every device, the same way world-nav/tab-bar stay flush with the screen
-   bottom elsewhere. */
-#login-screen{align-items:center;justify-content:flex-end;background:#000;background-size:cover;background-position:center;background-repeat:no-repeat;overflow:hidden;position:relative;padding-bottom:32px;}
-.login-box{width:100%;max-width:360px;position:relative;z-index:2;transition:none;}
+/* .login-box is pinned with position:absolute + bottom, not centered via
+   flex justify-content. This is a deliberate belt-and-braces choice: an
+   absolute offset from the bottom edge of #login-screen can't be defeated
+   by any flex quirk in a parent (nested % heights, old WebView flex bugs,
+   etc) the way justify-content:flex-end theoretically could be — it's the
+   exact same bottom:0-style anchoring #vkb already uses elsewhere in this
+   file. background-size:cover always fills #login-screen edge to edge, so
+   "bottom of the background" == "bottom of #login-screen", and a fixed
+   distance from that edge is all that's needed to keep the Create Account
+   button lined up with it on every device. */
+#login-screen{align-items:center;justify-content:center;background:#000;background-size:cover;background-position:center;background-repeat:no-repeat;overflow:hidden;position:relative;}
+.login-box{width:100%;max-width:360px;position:absolute;left:50%;bottom:32px;transform:translateX(-50%);z-index:2;transition:none;}
 #li-scanline,#ci-scanline{display:none;}
 #li-title{font-size:32px;font-weight:bold;letter-spacing:8px;color:#fff;font-family:'Courier New',monospace;text-align:center;opacity:0;animation:ci-flicker 1.4s ease 0.3s forwards,ci-glow 4s ease 1.8s infinite,ci-glitch 9s ease 2.5s infinite;line-height:1.15;}
 #li-sub{font-size:9px;letter-spacing:5px;color:#444;font-family:'Courier New',monospace;text-align:center;opacity:0;animation:ci-fadein 0.8s ease 1.8s forwards,ci-glitch2 11s ease 4s infinite;margin-top:4px;margin-bottom:0;}
@@ -22390,7 +22392,7 @@ document.addEventListener("selectionchange",()=>{
       setTimeout(applyScrollPushForField,80);
     } else {
       if(LOGIN_KEYS[activeField.key]&&currentShift>0){
-        if(loginBox) loginBox.style.transform="translateY(-"+Math.round(currentShift)+"px)";
+        if(loginBox) loginBox.style.transform="translate(-50%,-"+Math.round(currentShift)+"px)";
       }
       if(CREATE_KEYS[activeField.key]) applyCreateSlide();
       if(FRIEND_KEYS[activeField.key]) applyFriendSlide();
