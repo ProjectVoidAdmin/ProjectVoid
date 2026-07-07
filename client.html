@@ -22606,6 +22606,7 @@ document.addEventListener("selectionchange",()=>{
     "makedev <username>",
     "materials [filter]",
     "memory",
+    "nochar",
     "player <charname>",
     "players",
     "provisions [filter]",
@@ -22820,6 +22821,7 @@ document.addEventListener("selectionchange",()=>{
 
       M('PLAYERS');
       P('players');                           M('  All players (online+offline) — sub then playtime');
+      P('nochar');                            M('  Accounts registered but no character created yet');
       P('clients');                           M('  Raw WebSocket client list, includes auth-pending');
       P('search <fragment>');                 M('  Find players by name — shows status, playtime, and sub');
       P('player <charname>');                 M('  Full save data for a player');
