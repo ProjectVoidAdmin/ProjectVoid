@@ -22114,17 +22114,6 @@ document.addEventListener("selectionchange",()=>{
       return;
     }
     _isPC=false; // Ensure mobile mode when showing VKB
-    // Hide world nav when chat keyboard opens so keyboard covers it perfectly
-    if(GAME_KEYS[activeField.key]){
-      var worldNav=document.getElementById("world-nav");
-      if(worldNav){
-        var navH=worldNav.getBoundingClientRect().height;
-        vkbEl.style.height=navH+"px";
-        vkbEl.style.minHeight=navH+"px";
-        vkbEl.style.maxHeight=navH+"px";
-        worldNav.style.visibility="hidden";
-      }
-    }
     if(!alreadyOpen){
       vkbEl.classList.add("show");
       var _atEl=document.getElementById('admin-terminal');
@@ -22163,11 +22152,8 @@ document.addEventListener("selectionchange",()=>{
     currentShift=0;
     renderAll();
     vkbEl.classList.remove("show");
-    vkbEl.style.height="";vkbEl.style.minHeight="";vkbEl.style.maxHeight="";
     var _atEl=document.getElementById('admin-terminal');
     if(_atEl) _atEl.classList.remove('vkb-up');
-    var worldNav=document.getElementById("world-nav");
-    if(worldNav) worldNav.style.visibility="";
     if(loginScreen) loginScreen.classList.remove("vkb-open");
     var loginScreenHidden=loginScreen&&(loginScreen.style.opacity==="0"||loginScreen.style.display==="none");
     if(loginBox&&!loginScreenHidden){
