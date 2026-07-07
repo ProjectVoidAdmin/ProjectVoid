@@ -20102,7 +20102,7 @@ function setupLogin(){
     loginMode=mode;
     window._pvLoginMode=mode;
     el("li-sub").textContent=mode==="login"?"SIGN IN":"CREATE ACCOUNT";
-    submitBtn.textContent=mode==="login"?"SIGN IN":"CREATE ACCOUNT";
+    submitBtn.textContent=mode==="login"?"SIGN IN":"CONFIRM PASSWORD";
     toggleBtn.textContent=mode==="login"?"Create New Account":"Back to Sign In";
     pwConfirmWrap.style.display="none"; // confirm box stays hidden — pw field now handles its own two-step confirm
     el("login-err").style.display="none";
@@ -20128,6 +20128,29 @@ function setupLogin(){
     btn.classList.add("pressed");
     setTimeout(()=>btn.classList.remove("pressed"),220);
   }
+  // Hoisted so both doSubmit() and the submit-button's own register-mode
+  // stage handling (first tap = capture password, second tap = confirm) can
+  // flash the password box without duplicating this helper.
+  function _flashPwBorder(){
+    const pwBox=el("login-pw");
+    if(!pwBox)return;
+    pwBox.style.setProperty("border-color","#cc2020","important");
+    pwBox.style.setProperty("box-shadow","0 0 0 1px #cc2020","important");
+    setTimeout(()=>{
+      pwBox.style.removeProperty("border-color");
+      pwBox.style.removeProperty("box-shadow");
+    },1000);
+  }
+  function _flashPwBorderGreen(){
+    const pwBox=el("login-pw");
+    if(!pwBox)return;
+    pwBox.style.setProperty("border-color","#33cc44","important");
+    pwBox.style.setProperty("box-shadow","0 0 0 1px #33cc44","important");
+    setTimeout(()=>{
+      pwBox.style.removeProperty("border-color");
+      pwBox.style.removeProperty("box-shadow");
+    },1000);
+  }
   async function doSubmit(){
     el("login-err").style.display="none";
     el("login-ok").style.display="none";
@@ -20135,26 +20158,6 @@ function setupLogin(){
     const pw=getVal("login-pw");
     const pwc=getVal("login-pw-confirm");
     function showErr(msg){_dismissVkb();el("login-err").textContent=msg;el("login-err").style.display="block";}
-    function _flashPwBorder(){
-      const pwBox=el("login-pw");
-      if(!pwBox)return;
-      pwBox.style.setProperty("border-color","#cc2020","important");
-      pwBox.style.setProperty("box-shadow","0 0 0 1px #cc2020","important");
-      setTimeout(()=>{
-        pwBox.style.removeProperty("border-color");
-        pwBox.style.removeProperty("box-shadow");
-      },1000);
-    }
-    function _flashPwBorderGreen(){
-      const pwBox=el("login-pw");
-      if(!pwBox)return;
-      pwBox.style.setProperty("border-color","#33cc44","important");
-      pwBox.style.setProperty("box-shadow","0 0 0 1px #33cc44","important");
-      setTimeout(()=>{
-        pwBox.style.removeProperty("border-color");
-        pwBox.style.removeProperty("box-shadow");
-      },1000);
-    }
     if(!uname||!pw){_flashPwBorder();return;}
     // Register-mode validation before connecting to server
     if(loginMode==="register"){
@@ -20250,6 +20253,29 @@ function setupLogin(){
     setTimeout(()=>{_submitLocked=false;},500);
     if(!_tapLock())return;
     _playBtnAnim(submitBtn);
+    if(loginMode==="register"&&window._pvAdvancePwStage){
+      const stage=window._pvGetPwStage?window._pvGetPwStage():0;
+      if(stage===0){
+        // Capturing the first password entry — validate username first so
+        // people don't get sent into the confirm step with a bad username.
+        const uname=getVal("login-uname").trim();
+        if(uname.length<3||!/^[A-Za-z0-9_]+$/.test(uname)){_flashPwBorder();return;}
+        const res=window._pvAdvancePwStage();
+        if(res==="empty"){_flashPwBorder();return;}
+        el("login-err").style.display="none";
+        return; // wait for the confirm entry, button now reads CREATE ACCOUNT
+      } else {
+        const res=window._pvAdvancePwStage();
+        if(res==="matched"){
+          doSubmit();
+        } else {
+          el("login-err").textContent=(res==="tooshort")?"Password must be at least 6 characters":"Passwords didn't match — try again";
+          el("login-err").style.display="block";
+          _flashPwBorder();
+        }
+        return;
+      }
+    }
     doSubmit();
   },{capture:true});
   // Load remembered username (active session OR last-used fallback)
@@ -21900,12 +21926,63 @@ document.addEventListener("selectionchange",()=>{
   // stage 1 = re-entry that must match. window._pvLoginMode is set by
   // setupLogin()'s setMode() so this IIFE knows login vs register.
   var pwConfirmStage=0, pwFirstEntry="";
+  function pvSyncSubmitLabel(){
+    var b=document.getElementById("login-submit-btn");
+    if(!b) return;
+    if(window._pvLoginMode==="register"){
+      b.textContent=(pwConfirmStage===1)?"CREATE ACCOUNT":"CONFIRM PASSWORD";
+    }
+  }
+  window._pvSyncSubmitLabel=pvSyncSubmitLabel;
+  window._pvGetPwStage=function(){return pwConfirmStage;};
+  // Shared stage-advance logic used by both the on-screen keyboard's DONE key
+  // and the login-submit button (register mode only). Returns one of:
+  //   "empty"     — nothing typed yet at stage 0, ignore
+  //   "advanced"  — first entry captured, field cleared for re-entry
+  //   "matched"   — re-entry matches first entry and meets length rule
+  //   "tooshort"  — re-entry matches but is under the length rule
+  //   "mismatch"  — re-entry does not match first entry
+  window._pvAdvancePwStage=function(){
+    var pwField=document.getElementById("login-pw");
+    if(!pwField) return null;
+    var curVal=vals.pw||"";
+    if(pwConfirmStage===0){
+      if(curVal.length===0){return "empty";}
+      pwFirstEntry=curVal;
+      pwConfirmStage=1;
+      vals.pw="";
+      pwField.dataset.placeholder="Confirm password";
+      renderField(pwField);
+      pvSyncSubmitLabel();
+      return "advanced";
+    } else {
+      var _sameText=curVal.length>0&&curVal===pwFirstEntry;
+      var _matches=_sameText&&curVal.length>=6;
+      if(_matches){
+        vals.pwc=curVal;
+        pwConfirmStage=0;
+        pwFirstEntry="";
+        pwField.dataset.placeholder="Enter password";
+        pvSyncSubmitLabel();
+        return "matched";
+      } else {
+        vals.pw="";vals.pwc="";
+        pwConfirmStage=0;
+        pwFirstEntry="";
+        pwField.dataset.placeholder="Enter password";
+        renderField(pwField);
+        pvSyncSubmitLabel();
+        return _sameText?"tooshort":"mismatch";
+      }
+    }
+  };
   window._pvResetPwConfirm=function(){
     pwConfirmStage=0; pwFirstEntry="";
     var f=document.getElementById("login-pw");
     if(f) f.dataset.placeholder="Enter password";
     var errEl=document.getElementById("login-err");
     if(errEl) errEl.style.display="none";
+    pvSyncSubmitLabel();
   };
 
   function getPlaceholder(f){return f.dataset.placeholder||"";}
@@ -22310,40 +22387,17 @@ document.addEventListener("selectionchange",()=>{
       if(!k) return;
       if(k==="DONE"){
         if(activeField&&activeField.key==="pw"&&window._pvLoginMode==="register"){
-          var pwField=activeField.el;
-          var curVal=vals.pw||"";
-          if(pwConfirmStage===0){
-            if(curVal.length===0){return;} // nothing typed yet, ignore
-            pwFirstEntry=curVal;
-            pwConfirmStage=1;
-            vals.pw="";
-            pwField.dataset.placeholder="Re-enter password";
-            renderField(pwField);
-            return; // keep keyboard open for the re-entry
-          } else {
-            var _sameText=curVal.length>0&&curVal===pwFirstEntry;
-            var _matches=_sameText&&curVal.length>=6;
-            if(_matches){
-              vals.pwc=curVal; // keep pw as typed; mirror into pwc so existing submit validation passes
-              pwConfirmStage=0;
-              pwFirstEntry="";
-              pwField.dataset.placeholder="Enter password";
-              closeKeyboard();
-              return;
-            } else {
-              var errEl=document.getElementById("login-err");
-              if(errEl){
-                errEl.textContent=_sameText?"Password must be at least 6 characters":"Passwords didn't match — try again";
-                errEl.style.display="block";
-              }
-              vals.pw="";vals.pwc="";
-              pwConfirmStage=0;
-              pwFirstEntry="";
-              pwField.dataset.placeholder="Enter password";
-              renderField(pwField);
-              return; // keep keyboard open to retry
-            }
+          var _res=window._pvAdvancePwStage();
+          if(_res==="empty"){return;}
+          if(_res==="advanced"){return;} // keep keyboard open for the re-entry
+          if(_res==="matched"){closeKeyboard();return;}
+          // "tooshort" or "mismatch"
+          var errEl=document.getElementById("login-err");
+          if(errEl){
+            errEl.textContent=(_res==="tooshort")?"Password must be at least 6 characters":"Passwords didn't match — try again";
+            errEl.style.display="block";
           }
+          return; // keep keyboard open to retry
         }
         closeKeyboard();return;
       }
