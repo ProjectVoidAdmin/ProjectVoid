@@ -21826,11 +21826,6 @@ document.addEventListener("selectionchange",()=>{
     const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
     const gs = document.getElementById('game-screen');
     let navTop = null;
-    // Only trust nav-bar measurements while the game world screen is the one
-    // actually on screen. On login/create-account/popups/dev-panel, #game-screen
-    // (and everything inside it, including #log-area) is display:none, so any
-    // rect read from it collapses to 0 — which previously made navTop land at
-    // 0 and the keyboard stretch to cover the entire viewport.
     if(gs && gs.classList.contains('active')){
       // Normal world view: the tab bar (Zone/Social/Character/Inventory/etc)
       const tb = document.getElementById('tab-bar');
@@ -21854,11 +21849,17 @@ document.addEventListener("selectionchange",()=>{
           if(b > 0) navTop = b;
         }
       }
+    } else {
+      // Not in the game world yet (login/create-account/popups/dev-panel).
+      // Re-measure the nav bar off-screen EVERY time this runs, rather than
+      // trusting a value cached once at page load — the visual viewport can
+      // still be settling then (mobile browser chrome collapsing/expanding),
+      // so a one-time early measurement can lock in a wrong number that
+      // nothing would otherwise correct until the player actually logs in.
+      navTop = measureNavTopOffscreen();
     }
     if(navTop === null){
-      // Not in the game world — reuse the last real nav-bar measurement so
-      // the keyboard stays exactly the same size everywhere. Until we have
-      // one (e.g. very first load, pre-login), use the bootstrap default.
+      // Measurement unavailable this call — reuse the last good value.
       root.style.setProperty('--vkb-h', (cachedNavVkbH || VKB_FIXED_H) + 'px');
       return;
     }
@@ -21870,19 +21871,16 @@ document.addEventListener("selectionchange",()=>{
   }
   window._pvUpdateVkbHeight = updateVkbHeight;
 
-  // Measures the nav bar's true height/position BEFORE the player has ever
-  // logged in, so the keyboard is correctly sized from the very first time
-  // it's opened on the login screen — not just after visiting the game world.
-  // #game-screen is normally display:none (via .screen{display:none!important})
-  // until login, so we can't read it directly. Instead we briefly force it to
-  // render off-screen (still fully laid out, just invisible and non-interactive),
-  // measure the tab bar, then put everything back exactly as it was.
-  function measureNavHeightUpfront(){
-    if(cachedNavVkbH !== null) return;
+  // Measures where the tab bar's top edge WOULD be, without requiring the
+  // player to have ever logged in. #game-screen and #world-nav are both
+  // display:none until the real game view is shown, so we briefly force them
+  // to render off-screen (still fully laid out, just invisible and inert),
+  // measure, then put everything back exactly as it was.
+  function measureNavTopOffscreen(){
     const gs = document.getElementById('game-screen');
     const wn = document.getElementById('world-nav');
     const tb = document.getElementById('tab-bar');
-    if(!gs || !wn || !tb) return;
+    if(!gs || !wn || !tb) return null;
     const prevGsStyle = gs.getAttribute('style') || '';
     const prevWnDisplay = wn.style.display;
     const prevTbHtml = tb.innerHTML;
@@ -21890,9 +21888,7 @@ document.addEventListener("selectionchange",()=>{
     // Inline !important beats the stylesheet's .screen{display:none!important}.
     gs.style.cssText = prevGsStyle+';display:flex!important;position:absolute!important;top:0!important;left:0!important;width:100%!important;height:100%!important;visibility:hidden!important;pointer-events:none!important;z-index:-1!important;';
     // #world-nav is ALSO display:none by default (only switched to flex by
-    // renderWorldNav() once the player is actually in-game) — without this,
-    // the tab bar sits inside a hidden parent and measures as zero-height,
-    // producing a bogus number instead of the real one.
+    // renderWorldNav() once the player is actually in-game).
     wn.style.display = 'flex';
     // The tab bar's buttons are normally built by renderWorldNav() on login —
     // build temporary ones here purely to get the bar's real rendered height,
@@ -21906,20 +21902,14 @@ document.addEventListener("selectionchange",()=>{
       });
     }
     void gs.offsetHeight; // force layout before measuring
-    const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
     const r = tb.getBoundingClientRect();
-    if(r.height > 0){
-      const vkbH = Math.max(0, vh - r.top);
-      if(vkbH > 0){
-        cachedNavVkbH = vkbH;
-        root.style.setProperty('--vkb-h', vkbH + 'px');
-      }
-    }
+    const result = r.height > 0 ? r.top : null;
     // Put everything back exactly as it was — the real renderWorldNav() call
     // later still does its normal full rebuild since we restore an empty bar.
     gs.setAttribute('style', prevGsStyle);
     wn.style.display = prevWnDisplay;
     tb.innerHTML = prevTbHtml;
+    return result;
   }
 
   // At load, use visualViewport.height which respects browser chrome correctly
@@ -21931,8 +21921,10 @@ document.addEventListener("selectionchange",()=>{
 
   const lockedH = getInitialHeight();
   applyHeight(lockedH);
-  measureNavHeightUpfront();
-  // Measure after layout settles (fonts/images can shift log-area's rendered size)
+  updateVkbHeight();
+  // Measure again after layout/viewport settles — mobile browser chrome
+  // (address bar) can still be collapsing/expanding right after load, and
+  // fonts/images can shift log-area's rendered size.
   requestAnimationFrame(updateVkbHeight);
   setTimeout(updateVkbHeight, 300);
 
