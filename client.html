@@ -21880,13 +21880,20 @@ document.addEventListener("selectionchange",()=>{
   function measureNavHeightUpfront(){
     if(cachedNavVkbH !== null) return;
     const gs = document.getElementById('game-screen');
+    const wn = document.getElementById('world-nav');
     const tb = document.getElementById('tab-bar');
-    if(!gs || !tb) return;
+    if(!gs || !wn || !tb) return;
     const prevGsStyle = gs.getAttribute('style') || '';
+    const prevWnDisplay = wn.style.display;
     const prevTbHtml = tb.innerHTML;
     // Overlay it exactly where it would sit if visible, but invisible/inert.
     // Inline !important beats the stylesheet's .screen{display:none!important}.
     gs.style.cssText = prevGsStyle+';display:flex!important;position:absolute!important;top:0!important;left:0!important;width:100%!important;height:100%!important;visibility:hidden!important;pointer-events:none!important;z-index:-1!important;';
+    // #world-nav is ALSO display:none by default (only switched to flex by
+    // renderWorldNav() once the player is actually in-game) — without this,
+    // the tab bar sits inside a hidden parent and measures as zero-height,
+    // producing a bogus number instead of the real one.
+    wn.style.display = 'flex';
     // The tab bar's buttons are normally built by renderWorldNav() on login —
     // build temporary ones here purely to get the bar's real rendered height,
     // without touching STATE or any other app/game logic.
@@ -21911,6 +21918,7 @@ document.addEventListener("selectionchange",()=>{
     // Put everything back exactly as it was — the real renderWorldNav() call
     // later still does its normal full rebuild since we restore an empty bar.
     gs.setAttribute('style', prevGsStyle);
+    wn.style.display = prevWnDisplay;
     tb.innerHTML = prevTbHtml;
   }
 
