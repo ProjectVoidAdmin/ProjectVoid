@@ -21789,9 +21789,15 @@ document.addEventListener("selectionchange",()=>{
 (function(){
   const app = document.getElementById('app');
   const root = document.documentElement;
-  // Matches VKB_H used elsewhere (login/create slide calc) for screens that
-  // don't have a nav bar to measure against.
+  // Matches VKB_H used elsewhere (login/create slide calc) — only used as a
+  // bootstrap default before the real nav-bar height has ever been measured
+  // (e.g. on first load, before the player has logged in once).
   const VKB_FIXED_H = 190;
+  // Once we measure the keyboard height against the real in-game nav bar,
+  // we cache it here and reuse that exact number on every other screen
+  // (login/create-account/popups/dev-panel) so the keyboard is always the
+  // same size everywhere, not just while the nav bar itself is visible.
+  let cachedNavVkbH = null;
 
   // svh = small viewport height (excludes browser chrome, always the minimum)
   // This is already set via CSS (100svh). The JS lock below only handles
@@ -21850,15 +21856,63 @@ document.addEventListener("selectionchange",()=>{
       }
     }
     if(navTop === null){
-      // Not in the game world — use the fixed keyboard height instead of
-      // measuring a nav bar that isn't actually on screen.
-      root.style.setProperty('--vkb-h', VKB_FIXED_H + 'px');
+      // Not in the game world — reuse the last real nav-bar measurement so
+      // the keyboard stays exactly the same size everywhere. Until we have
+      // one (e.g. very first load, pre-login), use the bootstrap default.
+      root.style.setProperty('--vkb-h', (cachedNavVkbH || VKB_FIXED_H) + 'px');
       return;
     }
     const vkbH = Math.max(0, vh - navTop);
-    if(vkbH > 0) root.style.setProperty('--vkb-h', vkbH + 'px');
+    if(vkbH > 0){
+      cachedNavVkbH = vkbH;
+      root.style.setProperty('--vkb-h', vkbH + 'px');
+    }
   }
   window._pvUpdateVkbHeight = updateVkbHeight;
+
+  // Measures the nav bar's true height/position BEFORE the player has ever
+  // logged in, so the keyboard is correctly sized from the very first time
+  // it's opened on the login screen — not just after visiting the game world.
+  // #game-screen is normally display:none (via .screen{display:none!important})
+  // until login, so we can't read it directly. Instead we briefly force it to
+  // render off-screen (still fully laid out, just invisible and non-interactive),
+  // measure the tab bar, then put everything back exactly as it was.
+  function measureNavHeightUpfront(){
+    if(cachedNavVkbH !== null) return;
+    const gs = document.getElementById('game-screen');
+    const tb = document.getElementById('tab-bar');
+    if(!gs || !tb) return;
+    const prevGsStyle = gs.getAttribute('style') || '';
+    const prevTbHtml = tb.innerHTML;
+    // Overlay it exactly where it would sit if visible, but invisible/inert.
+    // Inline !important beats the stylesheet's .screen{display:none!important}.
+    gs.style.cssText = prevGsStyle+';display:flex!important;position:absolute!important;top:0!important;left:0!important;width:100%!important;height:100%!important;visibility:hidden!important;pointer-events:none!important;z-index:-1!important;';
+    // The tab bar's buttons are normally built by renderWorldNav() on login —
+    // build temporary ones here purely to get the bar's real rendered height,
+    // without touching STATE or any other app/game logic.
+    if(tb.children.length===0 && typeof TABS!=="undefined"){
+      TABS.forEach(([id,lbl])=>{
+        const btn=document.createElement('button');
+        btn.className='tab-btn';
+        btn.textContent=lbl;
+        tb.appendChild(btn);
+      });
+    }
+    void gs.offsetHeight; // force layout before measuring
+    const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const r = tb.getBoundingClientRect();
+    if(r.height > 0){
+      const vkbH = Math.max(0, vh - r.top);
+      if(vkbH > 0){
+        cachedNavVkbH = vkbH;
+        root.style.setProperty('--vkb-h', vkbH + 'px');
+      }
+    }
+    // Put everything back exactly as it was — the real renderWorldNav() call
+    // later still does its normal full rebuild since we restore an empty bar.
+    gs.setAttribute('style', prevGsStyle);
+    tb.innerHTML = prevTbHtml;
+  }
 
   // At load, use visualViewport.height which respects browser chrome correctly
   // Don't use screen.height (too large) or screen.availHeight (includes nav bars)
@@ -21869,6 +21923,7 @@ document.addEventListener("selectionchange",()=>{
 
   const lockedH = getInitialHeight();
   applyHeight(lockedH);
+  measureNavHeightUpfront();
   // Measure after layout settles (fonts/images can shift log-area's rendered size)
   requestAnimationFrame(updateVkbHeight);
   setTimeout(updateVkbHeight, 300);
