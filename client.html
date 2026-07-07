@@ -21953,12 +21953,10 @@ document.addEventListener("selectionchange",()=>{
 
   function applySlide(){
     loginScreen.classList.add("vkb-open");
-    var targetEl=document.getElementById("login-toggle-btn")||loginBox;
-    var targetBottom=targetEl?targetEl.getBoundingClientRect().bottom:0;
-    var actualKbH=vkbEl?vkbEl.getBoundingClientRect().height:VKB_H;
-    var keyboardTop=window.innerHeight-actualKbH;
-    currentShift=Math.max(0,targetBottom-keyboardTop+10);
-    if(loginBox) loginBox.style.transform="translateY(-"+Math.round(currentShift)+"px)";
+    // Login box no longer slides/translates when the keyboard opens — the
+    // on-screen keyboard is a fixed overlay and the form has enough room
+    // without needing to shift.
+    currentShift=0;
   }
 
   function applyCreateSlide(){
