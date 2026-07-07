@@ -20102,7 +20102,7 @@ function setupLogin(){
     loginMode=mode;
     window._pvLoginMode=mode;
     el("li-sub").textContent=mode==="login"?"SIGN IN":"CREATE ACCOUNT";
-    submitBtn.textContent=mode==="login"?"SIGN IN":"CONFIRM PASSWORD";
+    submitBtn.textContent=mode==="login"?"SIGN IN":"CREATE ACCOUNT";
     toggleBtn.textContent=mode==="login"?"Create New Account":"Back to Sign In";
     pwConfirmWrap.style.display="none"; // confirm box stays hidden — pw field now handles its own two-step confirm
     el("login-err").style.display="none";
@@ -20263,11 +20263,22 @@ function setupLogin(){
         const res=window._pvAdvancePwStage();
         if(res==="empty"){_flashPwBorder();return;}
         el("login-err").style.display="none";
-        return; // wait for the confirm entry, button now reads CREATE ACCOUNT
+        return; // wait for the confirm entry, button now reads CONFIRM PASSWORD
       } else {
         const res=window._pvAdvancePwStage();
         if(res==="matched"){
-          doSubmit();
+          // Advancing internally resets the stage (so a later register
+          // attempt starts fresh), which would otherwise flip this label
+          // back to CREATE ACCOUNT while doSubmit() is still in flight.
+          // Keep it reading CONFIRM PASSWORD until we actually leave the
+          // login screen (success) or an error brings the form back.
+          submitBtn.textContent="CONFIRM PASSWORD";
+          doSubmit().then(()=>{
+            const scr=el("login-screen");
+            if(scr&&scr.classList.contains("active")&&window._pvSyncSubmitLabel){
+              window._pvSyncSubmitLabel();
+            }
+          });
         }
         // "tooshort"/"mismatch" feedback is now shown inside the password
         // box itself (its placeholder + red flash), so nothing else to do.
@@ -21928,7 +21939,7 @@ document.addEventListener("selectionchange",()=>{
     var b=document.getElementById("login-submit-btn");
     if(!b) return;
     if(window._pvLoginMode==="register"){
-      b.textContent=(pwConfirmStage===1)?"CREATE ACCOUNT":"CONFIRM PASSWORD";
+      b.textContent=(pwConfirmStage===1)?"CONFIRM PASSWORD":"CREATE ACCOUNT";
     }
   }
   window._pvSyncSubmitLabel=pvSyncSubmitLabel;
