@@ -20158,11 +20158,11 @@ function setupLogin(){
     const pw=getVal("login-pw");
     const pwc=getVal("login-pw-confirm");
     function showErr(msg){_dismissVkb();el("login-err").textContent=msg;el("login-err").style.display="block";}
-    if(!uname||!pw){_flashPwBorder();return;}
+    if(!uname||!pw){_flashPwBorder();return false;}
     // Register-mode validation before connecting to server
     if(loginMode==="register"){
-      if(uname.length<3){_flashPwBorder();return;}
-      if(!/^[A-Za-z0-9_]+$/.test(uname)){_flashPwBorder();return;}
+      if(uname.length<3){_flashPwBorder();return false;}
+      if(!/^[A-Za-z0-9_]+$/.test(uname)){_flashPwBorder();return false;}
       const _confirmValid=pw===pwc&&pw.length>=6&&pwc.length>0;
       if(pw.length<6||!_confirmValid){
         _flashPwBorder();
@@ -20170,7 +20170,7 @@ function setupLogin(){
           const _pwcBox=el("login-pw-confirm");
           if(_pwcBox){_pwcBox.style.setProperty("border-color","#cc2020","important");setTimeout(()=>{_pwcBox.style.removeProperty("border-color");},500);}
         }
-        return;
+        return false;
       }
     }
     function saveRemember(u){_lsSet("pv_remember",JSON.stringify({u}));try{_lsSet("pv_last_uname",u);_nativeSetUsername(u);}catch(e){}}
@@ -20190,7 +20190,7 @@ function setupLogin(){
         },200);
         setTimeout(function(){clearInterval(_waitOpen);resolve();},5000);
       });
-      if(!_partyWs||_partyWs.readyState!==1){_authToken=_savedToken;_myUid=_savedUid;showErr("Cannot connect to server. Please try again.");return;}
+      if(!_partyWs||_partyWs.readyState!==1){_authToken=_savedToken;_myUid=_savedUid;showErr("Cannot connect to server. Please try again.");return false;}
     }
     // Restore in case login fails and user retries
     _authToken=_savedToken;_myUid=_savedUid;
@@ -20199,9 +20199,9 @@ function setupLogin(){
       const authRes=await _serverLogin(uname,pw);
       if(authRes.error){
         const msg=authRes.error.message||"";
-        if(msg==="TIMEOUT"||msg.includes("Not connected")){showErr("Cannot connect to server. Please try again.");return;}
-        if(msg==="invalid_credentials"){_flashPwBorder();return;}
-        showErr("Login failed: "+msg);return;
+        if(msg==="TIMEOUT"||msg.includes("Not connected")){showErr("Cannot connect to server. Please try again.");return false;}
+        if(msg==="invalid_credentials"){_flashPwBorder();return false;}
+        showErr("Login failed: "+msg);return false;
       }
       _authToken=authRes.token;_myUid=authRes.uid;
       _authUsername=uname;
@@ -20211,16 +20211,17 @@ function setupLogin(){
       await _wsRequest({type:"auth",token:_authToken,deviceId:_deviceId,fingerprint:_fingerprint,clientVersion:CLIENT_VERSION},"auth_ok",null,5000);
       saveRemember(uname);
       requestAnimationFrame(()=>requestAnimationFrame(()=>doLogin(uname)));
+      return true;
     } else {
       // Register — validation already passed above
       const authRes=await _serverRegister(uname,pw);
       if(authRes.error){
         const msg=authRes.error.message||"";
-        if(msg==="USERNAME_TAKEN"){showErr("Username already taken.");return;}
-        if(msg==="WEAK_PASSWORD"){_flashPwBorder();return;}
-        if(msg==="INVALID_USERNAME"){_flashPwBorder();return;}
-        if(msg==="TIMEOUT"||msg.includes("Not connected")){showErr("Cannot connect to server. Please try again.");return;}
-        showErr("Registration failed: "+msg);return;
+        if(msg==="USERNAME_TAKEN"){showErr("Username already taken.");return false;}
+        if(msg==="WEAK_PASSWORD"){_flashPwBorder();return false;}
+        if(msg==="INVALID_USERNAME"){_flashPwBorder();return false;}
+        if(msg==="TIMEOUT"||msg.includes("Not connected")){showErr("Cannot connect to server. Please try again.");return false;}
+        showErr("Registration failed: "+msg);return false;
       }
       _authToken=authRes.token;_myUid=authRes.uid;
       _authUsername=uname;
@@ -20231,6 +20232,7 @@ function setupLogin(){
       await _wsRequest({type:"auth",token:_authToken,deviceId:_deviceId,fingerprint:_fingerprint,clientVersion:CLIENT_VERSION},"auth_ok",null,5000);
       saveRemember(uname);
       requestAnimationFrame(()=>requestAnimationFrame(()=>doLogin(uname)));
+      return true;
     }
   }
   let _submitLocked=false;
@@ -20274,9 +20276,8 @@ function setupLogin(){
           // Keep it reading CONFIRM PASSWORD until we actually leave the
           // login screen (success) or an error brings the form back.
           submitBtn.textContent="CONFIRM PASSWORD";
-          doSubmit().then(()=>{
-            const scr=el("login-screen");
-            if(scr&&scr.classList.contains("active")&&window._pvSyncSubmitLabel){
+          doSubmit().then((ok)=>{
+            if(!ok&&window._pvSyncSubmitLabel){
               window._pvSyncSubmitLabel();
             }
           });
@@ -22585,7 +22586,7 @@ document.addEventListener("selectionchange",()=>{
     "clients",
     "count <table>",
     "dbsize",
-    "deleteaccount <charname>",
+    "deleteaccount <username>",
     "devs",
     "dm <charname> <message>",
     "endroom <roomid>",
@@ -22859,7 +22860,7 @@ document.addEventListener("selectionchange",()=>{
       M('PLAYER ACCOUNT MANAGEMENT');
       P('setpassword <charname> <password>'); M('  Set a new password (min 6 characters)');
       P('forcereset <charname>');             M('  Force password reset on next login');
-      P('deleteaccount <charname>');          M('  Permanently delete account and all data');
+      P('deleteaccount <username>');          M('  Permanently delete account and all data');
       P('');
 
       M('LOCAL  (no server round-trip)');
