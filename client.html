@@ -127,7 +127,7 @@ input{font-family:'Courier New',monospace;}
    taller than it is wide — but it's free to be shorter than that when there's
    less content. min(100vw,430px) mirrors #app's own width formula exactly, so
    the cap always matches the log box's actual rendered width. */
-#log-area{flex-shrink:0;width:100%;max-height:min(100vw,430px);box-sizing:border-box;display:flex;flex-direction:column;min-height:0;overflow:hidden;}
+#log-area{flex-shrink:0;flex-grow:0;width:100%;aspect-ratio:1/1;max-height:min(100vw,430px);box-sizing:border-box;display:flex;flex-direction:column;min-height:0;overflow:hidden;}
 .log-line{font-size:12px;line-height:1.6;padding:1px 0;}
 /* Chat */
 #chat-bar{flex-shrink:0;padding:6px 14px;display:flex;gap:6px;align-items:center;background:rgba(0,0,0,0.6);border-bottom:1px solid #666;}
@@ -1806,7 +1806,7 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   </div>
 
   <!-- Log area with General/Party/Guild/Combat tabs -->
-  <div id="log-area" style="flex:1;display:flex;flex-direction:column;min-height:0;">
+  <div id="log-area" style="flex:0 0 auto;display:flex;flex-direction:column;min-height:0;">
     <div style="display:flex;flex-shrink:0;border-bottom:1px solid #222;">
       <button id="log-tab-chat" style="flex:1;padding:5px 2px;background:#000;border:none;color:#fff;font-size:9px;letter-spacing:1px;font-family:'Courier New',monospace;">ZONE</button>
       <button id="log-tab-party" style="flex:1;padding:5px 2px;background:#000;border:none;color:#555;font-size:9px;letter-spacing:1px;font-family:'Courier New',monospace;">PARTY</button>
