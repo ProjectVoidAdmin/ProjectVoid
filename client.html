@@ -3651,7 +3651,7 @@ const PATHS = {
 
 // Maps a subzone's `type` field ('Dungeon'|'Raid'|'Trial'|'Fishing') to its
 // {base, boss} folder pair. Arena isn't here because it's a zone-level field
-// (arenaMusic1v1/2v2/4v4 + arenaBackground), not a subzone type.
+// (arenaMusic + arenaBackground), not a subzone type.
 const SUBZONE_PATHS = {
   Dungeon: { music: PATHS.dungeonMusic, bossMusic: PATHS.dungeonBossMusic, bg: PATHS.dungeonBg, bossBg: PATHS.dungeonBossBg },
   Raid:    { music: PATHS.raidMusic,    bossMusic: PATHS.raidBossMusic,    bg: PATHS.raidBg,    bossBg: PATHS.raidBossBg },
@@ -5449,9 +5449,7 @@ var _DEV_FIELDS = {
     {k:'music',        l:'Music Track',   t:'text', ph:'e.g. Duskwatch.mp3 (uploaded to /music) — leave blank for none'},
     {k:'background',   l:'Background',    t:'text', ph:'e.g. Duskwatch.png or Duskwatch.mp4 (uploaded to /background) — leave blank for none'},
     {k:'exploreMusic',   l:'Explore Music',      t:'text', ph:'e.g. DuskwatchExplore.mp3 — plays during Explore, leave blank to keep zone music', showIf:{k:'respawnRule',v:'Danger'}},
-    {k:'arenaMusic1v1',  l:'Arena Music (1v1)',  t:'text', ph:'e.g. Arena1v1.mp3 — leave blank for no arena music', showIf:{k:'respawnRule',v:'Safe'}},
-    {k:'arenaMusic2v2',  l:'Arena Music (2v2)',  t:'text', ph:'e.g. Arena2v2.mp3 — leave blank for no arena music', showIf:{k:'respawnRule',v:'Safe'}},
-    {k:'arenaMusic4v4',  l:'Arena Music (4v4)',  t:'text', ph:'e.g. Arena4v4.mp3 — leave blank for no arena music', showIf:{k:'respawnRule',v:'Safe'}},
+    {k:'arenaMusic',  l:'Arena Music',  t:'text', ph:'e.g. Arena.mp3 — plays for all Arena modes (1v1/2v2/4v4), leave blank for no arena music', showIf:{k:'respawnRule',v:'Safe'}},
     {k:'arenaBackground', l:'Arena Background', t:'text', ph:'e.g. Arena.png or Arena.mp4 — leave blank to keep zone background', showIf:{k:'respawnRule',v:'Safe'}},
     {k:'_market',      l:'Market',        t:'marketbox',   showIf:{k:'respawnRule',v:'Safe'}},
     {k:'_assignments', l:'Hostiles',      t:'assignmentsbox', showIf:{k:'respawnRule',v:'Danger'}},
@@ -5498,7 +5496,7 @@ function openDevPanel(){
   }).join('');
 
   var html='<div id="dev-panel" style="display:flex;flex-direction:column;height:100%;min-height:0;">'
-  +'<div style="display:flex;overflow-x:auto;gap:0;padding:0;border-bottom:1px solid #1a1a1a;flex-shrink:0;scrollbar-width:none;-webkit-overflow-scrolling:touch;" id="dev-tab-bar">'+tabBarHtml+'</div>'
+  +'<div style="display:flex;overflow-x:auto;gap:0;padding:0 24px 0 0;border-bottom:1px solid #1a1a1a;flex-shrink:0;scrollbar-width:none;-webkit-overflow-scrolling:touch;" id="dev-tab-bar">'+tabBarHtml+'</div>'
   +'<div id="dev-equip-sub-bar" class="dev-equip-sub-bar" style="display:none;">'
   +'<button class="dev-equip-sub-btn dev-equip-sub-active" data-esub="gears" data-esubtab="equipment">GEARS</button>'
   
@@ -13259,9 +13257,7 @@ function _handlePartyWsMessage(msg){
           music:z.music||"",
           background:z.background||"",
           exploreMusic:z.exploreMusic||"",
-          arenaMusic1v1:z.arenaMusic1v1||"",
-          arenaMusic2v2:z.arenaMusic2v2||"",
-          arenaMusic4v4:z.arenaMusic4v4||"",
+          arenaMusic:z.arenaMusic||z.arenaMusic1v1||z.arenaMusic2v2||z.arenaMusic4v4||"",
           arenaBackground:z.arenaBackground||"",
           _live:true,
         };
@@ -14032,7 +14028,7 @@ function _handlePartyWsMessage(msg){
       }
       _dismissArenaConfirm();
       _closeAllUI();
-      const _arenaTrack=STATE.zone&&STATE.zone['arenaMusic'+STATE._lastArenaMode];
+      const _arenaTrack=STATE.zone&&(STATE.zone.arenaMusic||STATE.zone['arenaMusic'+STATE._lastArenaMode]);
       const _arenaBg=STATE.zone&&STATE.zone.arenaBackground;
       _silenceAllMusic();
       showPvPMatchScreen(STATE._pvpOpponentName,()=>{
@@ -15186,7 +15182,7 @@ function _updateZoneMusic(zoneName, zoneId){
   if(!bgm)return;
   bgm.pause();
   const zoneObj=zoneId?ZONES.find(z=>z.id===zoneId):null;
-  const _zoneMusicFolder=zoneObj&&zoneObj.respawnRule==="Danger"?PATHS.zoneDangerMusic:PATHS.zoneSafeMusic;
+  const _zoneMusicFolder=zoneObj&&zoneObj.safe===false?PATHS.zoneDangerMusic:PATHS.zoneSafeMusic;
   const src=_resolveMusicSrc(zoneObj&&zoneObj.music, _zoneMusicFolder);
   if(src){
     bgm.src=src;
@@ -15340,7 +15336,7 @@ function _applyGameBackground(rawVal, folder){
 // switch together on travel/respawn.
 function _updateZoneBackground(zoneId){
   const zoneObj=zoneId?ZONES.find(z=>z.id===zoneId):null;
-  const _zoneBgFolder=zoneObj&&zoneObj.respawnRule==="Danger"?PATHS.zoneDangerBg:PATHS.zoneSafeBg;
+  const _zoneBgFolder=zoneObj&&zoneObj.safe===false?PATHS.zoneDangerBg:PATHS.zoneSafeBg;
   return _applyGameBackground(zoneObj&&zoneObj.background, _zoneBgFolder);
 }
 // Plays a one-off activity background (a Dungeon/Raid/Trial/Fishing subzone,
