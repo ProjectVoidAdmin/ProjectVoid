@@ -5117,7 +5117,7 @@ function confirmLogout(){
     // kill it, since the 250ms fade-out (and navigation itself, on a slow
     // connection) would otherwise leave zone/boss/login music audibly playing.
     if(typeof _silenceAllMusic==='function') _silenceAllMusic();
-    if(typeof STATE!=='undefined'){ STATE._activityMusicActive=false; STATE._pendingActivityTrack=undefined; STATE._pendingActivityBackground=undefined; }
+    if(typeof STATE!=='undefined'){ STATE._activityMusicActive=false; STATE._pendingActivityTrack=undefined; STATE._pendingActivityBackground=undefined; STATE._pendingActivityBgArmed=false; }
     const _lgLbv=document.getElementById('login-bg-video');
     if(_lgLbv){ _lgLbv.pause(); }
     // Close WS immediately
@@ -5163,6 +5163,7 @@ function doLogout(){
   STATE._activityMusicActive=false;
   STATE._pendingActivityTrack=undefined;
   STATE._pendingActivityBackground=undefined;
+  STATE._pendingActivityBgArmed=false;
   const _lbv=document.getElementById("login-bg-video");
   if(_lbv){_lbv.pause();}
   // Reset deferred data flag so next login re-fetches
@@ -14155,10 +14156,11 @@ function _handlePartyWsMessage(msg){
         STATE._pendingActivityTrack=undefined;
         STATE._pendingActivityFolder=undefined;
       }
-      if(!STATE._isPvP&&STATE._pendingActivityBackground!==undefined){
+      if(!STATE._isPvP&&STATE._pendingActivityBgArmed){
         _playActivityBackground(STATE._pendingActivityBackground, STATE._pendingActivityBgFolder);
         STATE._pendingActivityBackground=undefined;
         STATE._pendingActivityBgFolder=undefined;
+        STATE._pendingActivityBgArmed=false;
       }
       _dismissCombatTransition();
       if(STATE._isPvP){
@@ -14684,7 +14686,7 @@ function _handlePartyWsMessage(msg){
         const respawnZone=ZONES.find(z=>z.id===respawnZoneId)||ZONES[0];
         STATE.zone=respawnZone;
         _silenceAllMusic();
-        STATE._activityMusicActive=false;STATE._pendingActivityTrack=undefined;STATE._pendingActivityBackground=undefined;
+        STATE._activityMusicActive=false;STATE._pendingActivityTrack=undefined;STATE._pendingActivityBackground=undefined;STATE._pendingActivityBgArmed=false;
         STATE.tab="world";
         STATE._hasFled=false;
         updatePlayer(pp=>({...pp,hp:1,energy:0,cooldowns:{},isAlive:true}));
@@ -14703,7 +14705,7 @@ function _handlePartyWsMessage(msg){
         const respawnZone=ZONES.find(z=>z.id===respawnZoneId)||ZONES[0];
         STATE.zone=respawnZone;
         _silenceAllMusic();
-        STATE._activityMusicActive=false;STATE._pendingActivityTrack=undefined;STATE._pendingActivityBackground=undefined;
+        STATE._activityMusicActive=false;STATE._pendingActivityTrack=undefined;STATE._pendingActivityBackground=undefined;STATE._pendingActivityBgArmed=false;
         STATE.tab="world";
         const hasFled=STATE._hasFled;
         STATE._hasFled=false;
@@ -14744,7 +14746,7 @@ function _handlePartyWsMessage(msg){
         STATE.zone=respawnZone;
         _updateZoneMusic(respawnZone.name, respawnZone.id);
         _updateZoneBackground(respawnZone.id);
-        STATE._activityMusicActive=false;STATE._pendingActivityTrack=undefined;STATE._pendingActivityBackground=undefined;
+        STATE._activityMusicActive=false;STATE._pendingActivityTrack=undefined;STATE._pendingActivityBackground=undefined;STATE._pendingActivityBgArmed=false;
         STATE.tab="world";
         STATE._hasFled=false;
         updatePlayer(pp=>({...pp,energy:0,cooldowns:{},isAlive:true}));
@@ -14767,7 +14769,7 @@ function _handlePartyWsMessage(msg){
         const fleeRespawnZone=ZONES.find(z=>z.id===fleeRespawnId)||ZONES[0];
         STATE.zone=fleeRespawnZone;
         _silenceAllMusic();
-        STATE._activityMusicActive=false;STATE._pendingActivityTrack=undefined;STATE._pendingActivityBackground=undefined;
+        STATE._activityMusicActive=false;STATE._pendingActivityTrack=undefined;STATE._pendingActivityBackground=undefined;STATE._pendingActivityBgArmed=false;
         STATE.tab="world";
         STATE.player={...STATE.player,lastZone:fleeRespawnZone.id};
         addLog("info","Party escaped from combat.");
@@ -15340,12 +15342,15 @@ function _updateZoneBackground(zoneId){
   return _applyGameBackground(zoneObj&&zoneObj.background, _zoneBgFolder);
 }
 // Plays a one-off activity background (a Dungeon/Raid/Trial/Fishing subzone,
-// a boss level, or an Arena mode) if one is configured. Mirrors
-// _playActivityMusic: does nothing if no background is set for that
-// activity, leaving whatever backdrop is already showing (normally the
-// zone's own background) alone. Returns true if it actually switched.
+// a boss level, or an Arena mode) if one is configured. Unlike
+// _playActivityMusic, an unset background is NOT left showing whatever was
+// there before (normally the parent zone's own background, e.g. a Danger
+// zone's backdrop) - that reads as a mismatched/incorrect background to the
+// player. Instead, no background configured for the activity means a blank
+// backdrop for the duration of that activity. Returns true if it actually
+// switched to a real background (false when cleared to blank).
 function _playActivityBackground(rawBg, folder){
-  if(!rawBg)return false;
+  if(!rawBg){ _applyGameBackground(null, folder); return false; }
   _applyGameBackground(rawBg, folder);
   return true;
 }
@@ -16381,6 +16386,7 @@ function _enterSubzone(sz, szType, szName){
     } else {
       STATE._pendingActivityBackground=sz.background;
       STATE._pendingActivityBgFolder=_szPaths.bg;
+      STATE._pendingActivityBgArmed=true;
     }
     _showSubzoneCombatTransition(szName, szType);
     // Build member uid list
@@ -16475,6 +16481,10 @@ let _activeFishingSubzoneName = null;
 function openFishingMinigame(subzoneName, track, bg){
   if(STATE.fishCooldown>0||STATE.inCombat)return;
   _activeFishingSubzoneName = subzoneName || null;
+  // Silence whatever's currently playing (the zone's own ambient track) first,
+  // same as Dungeon/Raid/Trial/Arena entry — otherwise a fishing spot with no
+  // music of its own would leave the parent zone's music playing underneath.
+  _silenceAllMusic();
   STATE._activityMusicActive=_playActivityMusic(track, PATHS.fishingMusic);
   _playActivityBackground(bg, PATHS.fishingBg);
   if(_fishState)_cancelFishRAF();
@@ -17953,6 +17963,7 @@ function _applyPartyDoc(d){
       }else{
         STATE._pendingActivityBackground=_szObj&&_szObj.background;
         STATE._pendingActivityBgFolder=_szPaths.bg;
+        STATE._pendingActivityBgArmed=true;
       }
       _showSubzoneCombatTransition(d.combatSignal.szName||d.combatSignal.szType,d.combatSignal.szType);
     }else{
