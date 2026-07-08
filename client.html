@@ -3609,6 +3609,56 @@ function el(id){return document.getElementById(id);}
 // _playEventMusic, _updateZoneMusic, _playActivityMusic, _silenceAllMusic,
 // _resumeInterruptedMedia, _pauseMusicForBackground, etc. — keeps working
 // completely unchanged. Only the plumbing underneath is different.
+// ========================================
+//  R2 ASSET PATHS
+// ========================================
+// Set this to your bucket's public URL (r2.dev subdomain or custom domain),
+// no trailing slash. Every asset path below is built on top of it.
+const ASSET_BASE = "https://pub-15ff49b3d5964bdb8578da2ce61ffe67.r2.dev";
+
+// One folder path per category, matching the projectvoid-assets/ bucket tree
+// exactly (including capitalization/spacing — R2 keys are case-sensitive).
+// Each ends in "/" so callers just do PATHS.xxx + filename.
+const PATHS = {
+  loginBg:          ASSET_BASE + "/Image/Login Background/",
+  zoneDangerBg:     ASSET_BASE + "/Image/Zone Background/Danger Zone Background/",
+  zoneSafeBg:       ASSET_BASE + "/Image/Zone Background/Safe Zone Background/",
+  arenaBg:          ASSET_BASE + "/Image/Zone Background/Sub-Zone Background/Arena Background/",
+  dungeonBg:        ASSET_BASE + "/Image/Zone Background/Sub-Zone Background/Dungeon Background/",
+  dungeonBossBg:    ASSET_BASE + "/Image/Zone Background/Sub-Zone Background/Dungeon Background/Dungeon Boss Background/",
+  fishingBg:        ASSET_BASE + "/Image/Zone Background/Sub-Zone Background/Fishing Background/",
+  raidBg:           ASSET_BASE + "/Image/Zone Background/Sub-Zone Background/Raid Background/",
+  raidBossBg:       ASSET_BASE + "/Image/Zone Background/Sub-Zone Background/Raid Background/Raid Boss Background/",
+  trialBg:          ASSET_BASE + "/Image/Zone Background/Sub-Zone Background/Trial Background/",
+  trialBossBg:      ASSET_BASE + "/Image/Zone Background/Sub-Zone Background/Trial Background/Trial Boss Background/",
+
+  loginMusic:       ASSET_BASE + "/Music/Login Music/",
+  zoneDangerMusic:  ASSET_BASE + "/Music/Zone Music/Danger Zone Music/",
+  exploreMusic:     ASSET_BASE + "/Music/Zone Music/Danger Zone Music/Explore Music/",
+  zoneSafeMusic:    ASSET_BASE + "/Music/Zone Music/Safe Zone Music/",
+  arenaMusic:       ASSET_BASE + "/Music/Zone Music/Sub-Zone Music/Arena Music/",
+  dungeonMusic:     ASSET_BASE + "/Music/Zone Music/Sub-Zone Music/Dungeon Music/",
+  dungeonBossMusic: ASSET_BASE + "/Music/Zone Music/Sub-Zone Music/Dungeon Music/Dungeon Boss Music/",
+  fishingMusic:     ASSET_BASE + "/Music/Zone Music/Sub-Zone Music/Fishing Music/",
+  raidMusic:        ASSET_BASE + "/Music/Zone Music/Sub-Zone Music/Raid Music/",
+  raidBossMusic:    ASSET_BASE + "/Music/Zone Music/Sub-Zone Music/Raid Music/Raid Boss Music/",
+  trialMusic:       ASSET_BASE + "/Music/Zone Music/Sub-Zone Music/Trial Music/",
+  trialBossMusic:   ASSET_BASE + "/Music/Zone Music/Sub-Zone Music/Trial Music/Trial Boss Music/",
+  sfx:              ASSET_BASE + "/SFX/",
+  // Victory/Death/Flee/Berserk/Draw combat-outcome tracks live in SFX/, not Music/
+  eventMusic:       ASSET_BASE + "/SFX/",
+};
+
+// Maps a subzone's `type` field ('Dungeon'|'Raid'|'Trial'|'Fishing') to its
+// {base, boss} folder pair. Arena isn't here because it's a zone-level field
+// (arenaMusic1v1/2v2/4v4 + arenaBackground), not a subzone type.
+const SUBZONE_PATHS = {
+  Dungeon: { music: PATHS.dungeonMusic, bossMusic: PATHS.dungeonBossMusic, bg: PATHS.dungeonBg, bossBg: PATHS.dungeonBossBg },
+  Raid:    { music: PATHS.raidMusic,    bossMusic: PATHS.raidBossMusic,    bg: PATHS.raidBg,    bossBg: PATHS.raidBossBg },
+  Trial:   { music: PATHS.trialMusic,   bossMusic: PATHS.trialBossMusic,   bg: PATHS.trialBg,   bossBg: PATHS.trialBossBg },
+  Fishing: { music: PATHS.fishingMusic, bossMusic: PATHS.fishingMusic,     bg: PATHS.fishingBg, bossBg: PATHS.fishingBg },
+};
+
 let _pvAudioCtx=null;
 function _pvGetAudioCtx(){
   if(!_pvAudioCtx){
@@ -3726,7 +3776,7 @@ const _pvBgmTracks={
 // login-bgm's track used to come from a hardcoded src="music/Login.mp3" on the
 // <audio> tag itself — nothing ever set it via JS, so the wrapper needs the
 // same default or the login theme would never load.
-_pvBgmTracks["login-bgm"].src="music/Login.mp3";
+_pvBgmTracks["login-bgm"].src=PATHS.loginMusic+"Login.mp3";
 function _pvBgm(id){ return _pvBgmTracks[id]||null; }
 
 // ========================================
@@ -4421,8 +4471,8 @@ async function openCharSheetPopup(name, username, onClose){
 // through automatically the instant the video fails to load (wrong filename,
 // unsupported format, slow/broken connection, etc.) - no manual switching.
 // To go image-only, just leave LOGIN_BG_VIDEO blank ("").
-const LOGIN_BG_VIDEO="background/Login.mp4";
-const LOGIN_BG_IMAGE="background/Login.png";
+const LOGIN_BG_VIDEO=PATHS.loginBg+"Login.mp4";
+const LOGIN_BG_IMAGE=PATHS.loginBg+"Login.png";
 (function _setupLoginBackground(){
   const ls=document.getElementById("login-screen");
   const vid=document.getElementById("login-bg-video");
@@ -13986,9 +14036,9 @@ function _handlePartyWsMessage(msg){
       const _arenaBg=STATE.zone&&STATE.zone.arenaBackground;
       _silenceAllMusic();
       showPvPMatchScreen(STATE._pvpOpponentName,()=>{
-        STATE._activityMusicActive=_playActivityMusic(_arenaTrack);
+        STATE._activityMusicActive=_playActivityMusic(_arenaTrack, PATHS.arenaMusic);
       },()=>{
-        _playActivityBackground(_arenaBg);
+        _playActivityBackground(_arenaBg, PATHS.arenaBg);
       });
       renderWorldNav();
       break;
@@ -14105,12 +14155,14 @@ function _handlePartyWsMessage(msg){
       // Apply immediately (while the transition overlay is still fully opaque)
       // rather than waiting for dismissal, so the swap is never visible.
       if(!STATE._isPvP&&STATE._pendingActivityTrack!==undefined){
-        STATE._activityMusicActive=_playActivityMusic(STATE._pendingActivityTrack);
+        STATE._activityMusicActive=_playActivityMusic(STATE._pendingActivityTrack, STATE._pendingActivityFolder);
         STATE._pendingActivityTrack=undefined;
+        STATE._pendingActivityFolder=undefined;
       }
       if(!STATE._isPvP&&STATE._pendingActivityBackground!==undefined){
-        _playActivityBackground(STATE._pendingActivityBackground);
+        _playActivityBackground(STATE._pendingActivityBackground, STATE._pendingActivityBgFolder);
         STATE._pendingActivityBackground=undefined;
+        STATE._pendingActivityBgFolder=undefined;
       }
       _dismissCombatTransition();
       if(STATE._isPvP){
@@ -14242,13 +14294,14 @@ function _handlePartyWsMessage(msg){
           ?STATE.zone.subzones.find(s=>(s.name||s.type)===(msg.subzoneName||msg.subzoneType)&&(!msg.subzoneType||s.type===msg.subzoneType))
           :null;
         const _nextLvlObj=(_szForMusic&&Array.isArray(_szForMusic._levels))?_szForMusic._levels[(msg.nextLevel||1)-1]:null;
+        const _szPaths=SUBZONE_PATHS[_szForMusic&&_szForMusic.type]||SUBZONE_PATHS.Dungeon;
         if(_nextLvlObj&&_nextLvlObj.isBoss&&_nextLvlObj.bossMusic){
-          STATE._activityMusicActive=_playActivityMusic(_nextLvlObj.bossMusic);
+          STATE._activityMusicActive=_playActivityMusic(_nextLvlObj.bossMusic, _szPaths.bossMusic);
         }
         if(_nextLvlObj&&_nextLvlObj.isBoss&&_nextLvlObj.bossBackground){
-          _playActivityBackground(_nextLvlObj.bossBackground);
+          _playActivityBackground(_nextLvlObj.bossBackground, _szPaths.bossBg);
         } else if(_szForMusic&&_szForMusic.background){
-          _playActivityBackground(_szForMusic.background);
+          _playActivityBackground(_szForMusic.background, _szPaths.bg);
         }
       }
       addLog("combat_info","Level "+msg.level+" cleared! Advancing to level "+_szLvl+"...");
@@ -15069,13 +15122,14 @@ function _showTravelOverlay(){
   if(_pc){_pc.innerHTML="";}
 }
 
-// Accepts either a bare filename ("Duskwatch.mp3") as typed in the dev panel,
-// or an already-qualified path ("music/Duskwatch.mp3") for flexibility.
-function _resolveMusicSrc(val){
+// Accepts a bare filename ("Duskwatch.mp3") as typed in the dev panel and
+// prepends the R2 folder path for whichever category this track belongs to
+// (folder is one of the PATHS.* / SUBZONE_PATHS.*.* constants above).
+function _resolveMusicSrc(val, folder){
   if(!val)return null;
   val=String(val).trim();
   if(!val)return null;
-  return val.indexOf("music/")===0?val:"music/"+val;
+  return (folder||PATHS.loginMusic) + val;
 }
 // Immediately stops whatever is currently playing (login theme or a previous
 // zone's track) and starts the track for the destination zone, if one exists.
@@ -15108,7 +15162,7 @@ function _pvPlayIfVisible(track){
 }
 function _playEventMusic(key){
   const file=_EVENT_MUSIC[key];
-  const src=_resolveMusicSrc(file);
+  const src=_resolveMusicSrc(file, PATHS.eventMusic);
   const ev=_pvBgm("event-bgm");
   if(!ev)return;
   ev.pause();
@@ -15132,7 +15186,8 @@ function _updateZoneMusic(zoneName, zoneId){
   if(!bgm)return;
   bgm.pause();
   const zoneObj=zoneId?ZONES.find(z=>z.id===zoneId):null;
-  const src=_resolveMusicSrc(zoneObj&&zoneObj.music);
+  const _zoneMusicFolder=zoneObj&&zoneObj.respawnRule==="Danger"?PATHS.zoneDangerMusic:PATHS.zoneSafeMusic;
+  const src=_resolveMusicSrc(zoneObj&&zoneObj.music, _zoneMusicFolder);
   if(src){
     bgm.src=src;
     bgm.currentTime=0;
@@ -15149,8 +15204,8 @@ function _updateZoneMusic(zoneName, zoneId){
 // is already playing) is simply left alone. Returns true if it actually
 // switched tracks, so the caller knows to revert to zone music once the
 // activity ends (see _revertActivityMusic).
-function _playActivityMusic(rawTrack){
-  const src=_resolveMusicSrc(rawTrack);
+function _playActivityMusic(rawTrack, folder){
+  const src=_resolveMusicSrc(rawTrack, folder);
   if(!src)return false;
   const bgm=_pvBgm("zone-bgm");
   if(!bgm)return false;
@@ -15197,11 +15252,11 @@ function _silenceAllMusic(){
 // screen. Not developer-configurable per-zone-list here; the live zone/subzone/
 // level data set via the Developer Panel is the single source of truth.
 const _BG_VIDEO_EXT=/\.(mp4|webm|mov|m4v)$/i;
-function _resolveBgSrc(val){
+function _resolveBgSrc(val, folder){
   if(!val)return null;
   val=String(val).trim();
   if(!val)return null;
-  return val.indexOf("background/")===0?val:"background/"+val;
+  return (folder||PATHS.loginBg) + val;
 }
 // Applies a resolved background path to the game screen (or clears it if
 // none given). Video is used automatically when the filename's extension
@@ -15218,11 +15273,11 @@ function _resolveBgSrc(val){
 // resolves within ~4s even if the asset never loads/errors, so a bad/missing
 // file can never leave a transition stuck on screen forever.
 let _bgReadyPromise=Promise.resolve();
-function _applyGameBackground(rawVal){
+function _applyGameBackground(rawVal, folder){
   const gs=el("game-screen");
   if(!gs){ _bgReadyPromise=Promise.resolve(); return _bgReadyPromise; }
   const vid=el("zone-bg-video");
-  const src=_resolveBgSrc(rawVal);
+  const src=_resolveBgSrc(rawVal, folder);
   const _hud=el("_bg_debug_hud");
   if(!src){
     gs.style.backgroundImage="";
@@ -15285,16 +15340,17 @@ function _applyGameBackground(rawVal){
 // switch together on travel/respawn.
 function _updateZoneBackground(zoneId){
   const zoneObj=zoneId?ZONES.find(z=>z.id===zoneId):null;
-  return _applyGameBackground(zoneObj&&zoneObj.background);
+  const _zoneBgFolder=zoneObj&&zoneObj.respawnRule==="Danger"?PATHS.zoneDangerBg:PATHS.zoneSafeBg;
+  return _applyGameBackground(zoneObj&&zoneObj.background, _zoneBgFolder);
 }
 // Plays a one-off activity background (a Dungeon/Raid/Trial/Fishing subzone,
 // a boss level, or an Arena mode) if one is configured. Mirrors
 // _playActivityMusic: does nothing if no background is set for that
 // activity, leaving whatever backdrop is already showing (normally the
 // zone's own background) alone. Returns true if it actually switched.
-function _playActivityBackground(rawBg){
+function _playActivityBackground(rawBg, folder){
   if(!rawBg)return false;
-  _applyGameBackground(rawBg);
+  _applyGameBackground(rawBg, folder);
   return true;
 }
 // Call when an activity (Explore/subzone/Arena/boss level) ends and the
@@ -16282,6 +16338,7 @@ async function _doExploreStart(z){
   STATE.exploreCooldown=10;
   startCooldownTicker();
   STATE._pendingActivityTrack=z.exploreMusic;
+  STATE._pendingActivityFolder=PATHS.exploreMusic;
   STATE._pendingActivityBackground=undefined;
   _silenceAllMusic();
   // If in party, signal members to enter combat
@@ -16309,22 +16366,25 @@ function _enterSubzone(sz, szType, szName){
     }
     // Show the combat transition with the type as title and name as subtitle
     _silenceAllMusic();
+    const _szPaths=SUBZONE_PATHS[szType]||SUBZONE_PATHS.Dungeon;
     const _firstLvl=(Array.isArray(sz._levels)&&sz._levels[0])?sz._levels[0]:null;
     if(_firstLvl&&_firstLvl.isBoss&&_firstLvl.bossMusic){
       // Level 1 is itself a Boss Level — start the boss track instantly rather
       // than waiting for combat_start to apply the subzone's base music.
       STATE._pendingActivityTrack=undefined;
-      STATE._activityMusicActive=_playActivityMusic(_firstLvl.bossMusic);
+      STATE._activityMusicActive=_playActivityMusic(_firstLvl.bossMusic, _szPaths.bossMusic);
     } else {
       STATE._pendingActivityTrack=sz.music;
+      STATE._pendingActivityFolder=_szPaths.music;
     }
     if(_firstLvl&&_firstLvl.isBoss&&_firstLvl.bossBackground){
       // Same idea as the boss music above — show the boss's own background
       // immediately rather than waiting for combat_start.
       STATE._pendingActivityBackground=undefined;
-      _playActivityBackground(_firstLvl.bossBackground);
+      _playActivityBackground(_firstLvl.bossBackground, _szPaths.bossBg);
     } else {
       STATE._pendingActivityBackground=sz.background;
+      STATE._pendingActivityBgFolder=_szPaths.bg;
     }
     _showSubzoneCombatTransition(szName, szType);
     // Build member uid list
@@ -16419,8 +16479,8 @@ let _activeFishingSubzoneName = null;
 function openFishingMinigame(subzoneName, track, bg){
   if(STATE.fishCooldown>0||STATE.inCombat)return;
   _activeFishingSubzoneName = subzoneName || null;
-  STATE._activityMusicActive=_playActivityMusic(track);
-  _playActivityBackground(bg);
+  STATE._activityMusicActive=_playActivityMusic(track, PATHS.fishingMusic);
+  _playActivityBackground(bg, PATHS.fishingBg);
   if(_fishState)_cancelFishRAF();
   const overlay=el("fishing-overlay");
   if(!overlay)return;
@@ -17882,22 +17942,26 @@ function _applyPartyDoc(d){
     if(d.combatSignal.szType){
       const _szObj=(STATE.zone&&Array.isArray(STATE.zone.subzones))?STATE.zone.subzones.find(s=>(s.name||s.type)===(d.combatSignal.szName||d.combatSignal.szType)):null;
       _silenceAllMusic();
+      const _szPaths=SUBZONE_PATHS[d.combatSignal.szType]||SUBZONE_PATHS.Dungeon;
       const _szFirstLvl=(_szObj&&Array.isArray(_szObj._levels)&&_szObj._levels[0])?_szObj._levels[0]:null;
       if(_szFirstLvl&&_szFirstLvl.isBoss&&_szFirstLvl.bossMusic){
         STATE._pendingActivityTrack=undefined;
-        STATE._activityMusicActive=_playActivityMusic(_szFirstLvl.bossMusic);
+        STATE._activityMusicActive=_playActivityMusic(_szFirstLvl.bossMusic, _szPaths.bossMusic);
       }else{
         STATE._pendingActivityTrack=_szObj&&_szObj.music;
+        STATE._pendingActivityFolder=_szPaths.music;
       }
       if(_szFirstLvl&&_szFirstLvl.isBoss&&_szFirstLvl.bossBackground){
         STATE._pendingActivityBackground=undefined;
-        _playActivityBackground(_szFirstLvl.bossBackground);
+        _playActivityBackground(_szFirstLvl.bossBackground, _szPaths.bossBg);
       }else{
         STATE._pendingActivityBackground=_szObj&&_szObj.background;
+        STATE._pendingActivityBgFolder=_szPaths.bg;
       }
       _showSubzoneCombatTransition(d.combatSignal.szName||d.combatSignal.szType,d.combatSignal.szType);
     }else{
       STATE._pendingActivityTrack=STATE.zone&&STATE.zone.exploreMusic;
+      STATE._pendingActivityFolder=PATHS.exploreMusic;
       STATE._pendingActivityBackground=undefined;
       _silenceAllMusic();
       showCombatTransition();
