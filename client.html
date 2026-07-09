@@ -2022,7 +2022,7 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
 <div id="idle-warn-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.88);z-index:99980;flex-direction:column;align-items:center;justify-content:center;pointer-events:all;">
   <div style="display:flex;flex-direction:column;align-items:center;width:100%;max-width:300px;padding:0 32px;text-align:center;">
     <div style="font-size:10px;letter-spacing:6px;color:#886600;font-family:'Courier New',monospace;margin-bottom:16px;">STILL THERE?</div>
-    <div style="font-size:11px;color:#555;font-family:'Courier New',monospace;margin-bottom:8px;line-height:1.7;">You've been inactive for 30 minutes.</div>
+    <div style="font-size:11px;color:#555;font-family:'Courier New',monospace;margin-bottom:8px;line-height:1.7;">You've been inactive for 10 minutes.</div>
     <div style="font-size:9px;color:#444;font-family:'Courier New',monospace;margin-bottom:24px;line-height:1.7;">Disconnecting in <span id="idle-warn-countdown" style="color:#886600;">60</span>s.</div>
     <button onclick="if(window._idleReset)window._idleReset();" style="background:#000;border:1px solid #554400;color:#886600;font-family:'Courier New',monospace;font-size:10px;letter-spacing:3px;padding:10px 24px;cursor:pointer;border-radius:2px;-webkit-tap-highlight-color:transparent;">I'M HERE</button>
   </div>
@@ -2036,7 +2036,7 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
       <div style="position:absolute;top:0;left:0;width:30%;height:100%;background:#333;border-radius:2px;animation:rc-bar-loop 1.4s ease-in-out infinite;"></div>
     </div>
     <div id="rc-timeout-msg" style="display:none;margin-top:24px;font-size:10px;color:#444;letter-spacing:2px;font-family:'Courier New',monospace;line-height:1.7;text-align:center;">Taking longer than expected.<br>
-      <button id="rc-refresh-btn" style="margin-top:12px;padding:10px 20px;background:#000;border:1px solid #333;border-radius:4px;color:#555;font-size:10px;letter-spacing:3px;font-family:'Courier New',monospace;cursor:pointer;">REFRESH</button>
+      <button id="rc-logout-btn" style="margin-top:12px;padding:10px 20px;background:#000;border:1px solid #333;border-radius:4px;color:#555;font-size:10px;letter-spacing:3px;font-family:'Courier New',monospace;cursor:pointer;">LOG OUT</button>
     </div>
   </div>
 </div>
@@ -3492,25 +3492,18 @@ window.addEventListener("pagehide",()=>{
     _wsSend({type:"patch_save",fields:patchData});
   }
 });
+// NOTE: Previously this force-closed the WebSocket ~20s after the tab/app went
+// hidden ("tab_hidden"), which is what caused players to get disconnected just
+// from backgrounding the standalone app or switching tabs. The connection is
+// already kept alive while hidden by the _wsHiddenKeepalive ping (45s interval,
+// see _connectCombatWsForRejoin) and the server's ping/pong + 60s idle safety
+// net, so an explicit disconnect here is unnecessary — the socket should stay
+// open for as long as the tab/app itself stays open. We just track presence
+// (online/offline for friends-list display) without touching the connection.
 (()=>{
-  let _visHideTimer=null;
   document.addEventListener("visibilitychange",()=>{
     if(!STATE.username)return;
-    if(document.hidden){
-      // Grace period before disconnecting — covers brief tab switches (e.g. checking another tab quickly)
-      // After 30s hidden with no return, actively close the WebSocket so the server marks them offline immediately
-      _visHideTimer=setTimeout(()=>{
-        if(!document.hidden)return; // came back before timer fired
-        if(document.hidden&&STATE.username){presenceSetOffline(STATE.username);}
-        // Close the WS — server will see the disconnect and mark player offline
-        // The client reconnect logic will bring them back when they return to the tab
-        if(_partyWs&&_partyWs.readyState===1){
-          try{_wsFlushQueue();_partyWs.close(1000,"tab_hidden");}catch(e){}
-        }
-      },20000); // 20s grace period
-    } else {
-      if(_visHideTimer){clearTimeout(_visHideTimer);_visHideTimer=null;}
-      // Small delay ensures any in-flight offline write settles before we broadcast online again
+    if(!document.hidden){
       setTimeout(()=>{
         if(!document.hidden&&STATE.username){presenceSetOnline(STATE.username);}
       },500);
@@ -3518,10 +3511,13 @@ window.addEventListener("pagehide",()=>{
   });
 })();
 
-// ── 30-minute idle auto-timeout ───────────────────────────────────────────────
-// Disconnects AFK players after 30min of no interaction.
+// ── 11-minute idle auto-timeout ───────────────────────────────────────────────
+// Disconnects AFK players after 10min of no interaction + a 1min "are you still
+// there?" grace window (11min total). This is purely activity-based (mouse/
+// touch/key/scroll) and is NOT affected by tab/app visibility — backgrounding
+// the tab or app does not by itself count as inactivity.
 (()=>{
-  const IDLE_WARN_MS = 29 * 60 * 1000; // warn at 29min
+  const IDLE_WARN_MS = 10 * 60 * 1000; // warn at 10min of no interaction
   let _idleWarnTimer = null;
   let _idleKickTimer = null;
   let _idleWarnShowing = false;
@@ -12844,14 +12840,14 @@ function _showReconnectScreen(){
   const tmsg=document.getElementById("rc-timeout-msg");
   if(tmsg) tmsg.style.display="none";
   ov.style.display="flex";
-  // 60-second timeout message
+  // 30-second timeout message
   if(_rcTimeoutTimer){clearTimeout(_rcTimeoutTimer);_rcTimeoutTimer=null;}
   _rcTimeoutTimer=setTimeout(()=>{
     const t=document.getElementById("rc-timeout-msg");
     if(t) t.style.display="block";
-    const btn=document.getElementById("rc-refresh-btn");
-    if(btn) btn.onclick=()=>window.location.reload();
-  },60000);
+    const btn=document.getElementById("rc-logout-btn");
+    if(btn) btn.onclick=()=>{ if(typeof doLogout==="function")doLogout(); };
+  },30000);
 }
 
 function _hideReconnectScreen(){
@@ -20920,7 +20916,7 @@ function _renderFreshWorldUI(){
 }
 function startGame(){
   STATE._gameStarted=true;
-  // Reset idle timeout on login so the 30min clock starts fresh
+  // Reset idle timeout on login so the 10min clock starts fresh
   if(window._idleReset)window._idleReset();
   // Social tab live-update: dirty flag approach — zero cost when nothing changed.
   // Any social state change sets _socialDirty=true. The interval only re-renders
