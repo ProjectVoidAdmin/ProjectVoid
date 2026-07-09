@@ -2335,6 +2335,23 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
     return _pvIsNativeApp||!!(document.fullscreenElement||document.webkitFullscreenElement)||window.matchMedia("(display-mode: standalone)").matches;
   }
   window._isFsActive=_isFsActive;
+  // ── Shared "are we actually in the foreground" check ──────────────────────
+  // Placed early (before anything that needs it, like the WS reconnect logic
+  // further down) and used as the single source of truth everywhere this
+  // matters, instead of each call site trusting document.hidden on its own.
+  // document.hidden/visibilitychange is exactly the kind of thing bare
+  // WebView wrappers (like the standalone app) are known to fire late,
+  // inconsistently, or not at all - so this combines it with two independent
+  // signals that don't depend on the WebView dispatching anything correctly:
+  //   - !document.hasFocus() — OS-level window/Activity focus
+  //   - stale requestAnimationFrame — rAF is throttled/stopped by the
+  //     renderer itself the instant the view truly isn't being drawn,
+  //     regardless of whether any JS event fires
+  window._pvLastRaf=Date.now();
+  (function _pvRafTick(){ window._pvLastRaf=Date.now(); requestAnimationFrame(_pvRafTick); })();
+  window._pvIsBackgrounded=function(){
+    return document.hidden||!document.hasFocus()||(Date.now()-window._pvLastRaf)>3000;
+  };
   function _forceFullscreen(){
     if(_pvIsNativeApp){_lockPortrait();return false;}
     var _dlOv=document.getElementById("devlog-overlay");
@@ -12728,6 +12745,8 @@ function _connectCombatWsForRejoin(){
       window._wsDisconnectShown=false;
     }
     if(window._wsDisconnectTimer){clearTimeout(window._wsDisconnectTimer);window._wsDisconnectTimer=null;}
+    window._wsReconnectAttempts=0;
+    window._wsReconnectPendingOnForeground=false;
     // Hide reconnect screen if it was showing, and always unfreeze input
     // (fast combat reconnects skip the reconnect screen entirely but input is still frozen)
     _unfreezeInput();
@@ -12807,23 +12826,65 @@ function _connectCombatWsForRejoin(){
         },2000);
       }
     }
-    // Only show disconnect message if not reconnected within 5 seconds
-    if(STATE.player&&STATE.player.name){
+    // Only show disconnect message if not reconnected within 5 seconds.
+    // Guard against stacking multiple timers if several closes happen in a
+    // row before any of them reaches onopen (was previously unconditional -
+    // that's part of what produced walls of repeated "Disconnected/Connected"
+    // lines when the connection kept dying and retrying in quick succession).
+    if(STATE.player&&STATE.player.name&&!window._wsDisconnectTimer&&!window._wsDisconnectShown){
       window._wsDisconnectTimer=setTimeout(()=>{
+        window._wsDisconnectTimer=null;
         addLog("info","Disconnected from server. (code:"+ev.code+")");
         window._wsDisconnectShown=true;
       },5000);
     }
-    // Instant reconnect during combat, 1s otherwise — add jitter for non-combat to reduce thundering herd
-    var baseDelay=STATE.inCombat?0:1000;
-    var jitter=STATE.inCombat?0:Math.floor(Math.random()*3000);
+    // While the app/tab is actually backgrounded, don't schedule a timed
+    // retry at all - if the OS/WebView is throttling or blocking network
+    // access for a backgrounded app (very common for standalone WebView
+    // wrappers, and exactly what was producing the rapid disconnect/
+    // reconnect/disconnect spam: each retry would briefly succeed then get
+    // killed again within seconds), hammering reconnect attempts on a timer
+    // just burns battery/CPU for nothing and floods the log. Instead, mark
+    // a reconnect as pending and let the visibilitychange/focus/pageshow
+    // handlers (which already fire the instant the app returns to the
+    // foreground) trigger one clean reconnect attempt then.
+    if(window._pvIsBackgrounded()){
+      window._wsReconnectPendingOnForeground=true;
+      return;
+    }
+    // Instant reconnect on the very first retry (covers brief real blips
+    // while actually in the foreground) but back off on repeated failures -
+    // in combat this used to retry with 0 delay forever, which is fine for
+    // a one-off network hiccup but turns into a tight hammering loop if the
+    // connection keeps failing (flaky wifi, etc). Capped at 8s.
+    window._wsReconnectAttempts=(window._wsReconnectAttempts||0)+1;
+    var backoff=Math.min((window._wsReconnectAttempts-1)*2000,8000);
+    var baseDelay=(STATE.inCombat&&window._wsReconnectAttempts===1)?0:1000;
+    var jitter=(STATE.inCombat&&window._wsReconnectAttempts===1)?0:Math.floor(Math.random()*3000);
     if(_myUid&&_authToken){
       setTimeout(()=>{
-        if(!_partyWs)_connectCombatWsForRejoin();
-      },baseDelay+jitter);
+        if(!_partyWs&&!window._pvIsBackgrounded())_connectCombatWsForRejoin();
+        else if(!_partyWs)window._wsReconnectPendingOnForeground=true;
+      },baseDelay+jitter+backoff);
     }
   };
 }
+// Reconnect immediately the moment the app/tab returns to the foreground, if
+// a reconnect was deferred while it was backgrounded (see ws.onclose above).
+// This is what actually delivers "don't disconnect just because I tabbed
+// out" in practice: we can't stop the OS from cutting a backgrounded app's
+// network access, but we CAN make sure nothing thrashes retrying while it's
+// away, and that reconnecting is instant and clean the moment it's back.
+function _wsReconnectOnForeground(){
+  if(!window._wsReconnectPendingOnForeground)return;
+  if(window._pvIsBackgrounded())return;
+  window._wsReconnectPendingOnForeground=false;
+  window._wsReconnectAttempts=0;
+  if(_myUid&&_authToken&&(!_partyWs||_partyWs.readyState!==1))_connectCombatWsForRejoin();
+}
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden)_wsReconnectOnForeground(); });
+window.addEventListener("focus",_wsReconnectOnForeground);
+window.addEventListener("pageshow",_wsReconnectOnForeground);
 
 // ── Reconnect screen ──────────────────────────────────────────────────────────
 let _rcTimeoutTimer=null;
@@ -15157,6 +15218,19 @@ function _pvPlayIfVisible(track){
 function _playEventMusic(key){
   const file=_EVENT_MUSIC[key];
   const src=_resolveMusicSrc(file, PATHS.eventMusic);
+  // Silence whatever's on the zone-bgm channel (zone ambient track, or an
+  // activity track like Explore music) the instant an outcome screen's music
+  // starts. Previously this only happened later, inside the outcome screen's
+  // onDone callback (_revertActivityMusic, fired when the overlay finishes
+  // closing) - so e.g. Explore music kept looping right through the entire
+  // victory/death/berserk/flee screen, audible underneath the outcome sting.
+  // removeAttribute("src") (not just .pause()) marks this as intentional
+  // silence, same convention as _silenceAllMusic, so _resumeInterruptedMedia
+  // won't resume it if the player backgrounds/foregrounds while the outcome
+  // screen is still up - the zone's real track gets set fresh afterwards by
+  // _revertActivityMusic() -> _updateZoneMusic() once the screen closes.
+  const bgm=_pvBgm("zone-bgm");
+  if(bgm){bgm.pause();bgm.removeAttribute("src");bgm.currentTime=0;}
   const ev=_pvBgm("event-bgm");
   if(!ev)return;
   ev.pause();
@@ -15429,6 +15503,47 @@ window.addEventListener("pageshow",_resumeInterruptedMedia);
 // screen, etc.) don't reliably flip document.hidden when their own UI covers the
 // page, but window blur/focus still fires correctly in those same cases.
 window.addEventListener("blur",_pauseMusicForBackground);
+// pagehide is a stronger "this page is going away" signal than visibilitychange
+// on some mobile browsers/WebViews that skip visibilitychange entirely on
+// minimize. Harmless to call twice - _pauseMusicForBackground() is a no-op if
+// nothing is playing.
+window.addEventListener("pagehide",_pauseMusicForBackground);
+
+// ── Backstop watchdog: catches backgrounding even when NO event fires ─────────
+// The standalone app is a bare WebView wrapper (MIT App Inventor + a third-party
+// CustomWebView extension) with no Screen.Pause/Screen.Resume wiring at all on
+// the native side - there is nothing that tells the page's JS "the app was just
+// minimized." Everything above depends on the WebView correctly dispatching
+// visibilitychange/blur, which is exactly the kind of thing bare WebView wrappers
+// are known to skip or fire late/inconsistently. So this doesn't wait for any
+// specific event: it polls a few independent signals every 1.5s and force-pauses
+// the instant any of them says we're not in the foreground, regardless of
+// whether an event ever fired. Signals used:
+//   - document.hidden          — the standard Page Visibility flag
+//   - !document.hasFocus()     — reflects native window/Activity focus even when
+//                                 visibilitychange itself is buggy, since it's
+//                                 tied to the OS-level window-focus signal
+//   - requestAnimationFrame stall — rAF callbacks are throttled/stopped by the
+//                                 renderer itself whenever the view truly isn't
+//                                 being drawn (screen off, app switched away),
+//                                 independent of any JS event dispatch, so a
+//                                 stale rAF heartbeat catches cases the other
+//                                 two signals miss
+// (the rAF heartbeat + window._pvIsBackgrounded() combined check is defined
+// early in the script, alongside _isFsActive, so the WS reconnect logic can
+// also rely on it — see window._pvIsBackgrounded)
+let _pvBgWatchdogPaused=false;
+setInterval(()=>{
+  const backgrounded=window._pvIsBackgrounded();
+  if(backgrounded&&!_pvBgWatchdogPaused){
+    _pvBgWatchdogPaused=true;
+    _pauseMusicForBackground();
+  } else if(!backgrounded&&_pvBgWatchdogPaused){
+    _pvBgWatchdogPaused=false;
+    _resumeInterruptedMedia();
+    if(typeof _wsReconnectOnForeground==="function")_wsReconnectOnForeground();
+  }
+},1500);
 
 function showTravelScreen(zoneName, isSafe, onDone, zoneId, onBgReady){
   // Wrap onDone so every zone-change path (leader travel, party-follow,
