@@ -4378,6 +4378,29 @@ function addLog(type,text){
   else if(!isChatType&&!isSystemType&&!isDmType&&!isLootType&&activeLogTab!=="combat"){_unreadLogTabs.add("combat");}
   _applyLogTabColors();
 }
+// Post a plain message into every log tab at once (zone, party, guild,
+// system, combat, loot) instead of just one — used for things every
+// participant needs to see regardless of which tab they happen to have
+// open, e.g. the "combat ended, account reset" notice. Bypasses addLog's
+// per-type routing/formatting since this isn't tied to any single channel.
+function addLogAllTabs(text){
+  const targets=["log-chat","log-party","log-guild","log-system","log-combat","log-loot"];
+  const tabsByTarget={"log-chat":"chat","log-party":"party","log-guild":"guild","log-system":"system","log-combat":"combat","log-loot":"loot"};
+  for(const id of targets){
+    const logEl=el(id);
+    if(!logEl)continue;
+    const div=document.createElement("div");
+    div.className="log-line";
+    div.style.color=LOG_C.system;
+    div.textContent=text;
+    logEl.appendChild(div);
+    while(logEl.children.length>300)logEl.removeChild(logEl.firstChild);
+    logEl.scrollTop=logEl.scrollHeight;
+    const tab=tabsByTarget[id];
+    if(activeLogTab!==tab)_unreadLogTabs.add(tab);
+  }
+  _applyLogTabColors();
+}
 function switchLogTab(tab){
   activeLogTab=tab;
   el("log-chat").style.display=tab==="chat"?"flex":"none";
@@ -14630,6 +14653,26 @@ function _handlePartyWsMessage(msg){
       if(msg.members) _syncPartyMembersFromWs(msg.members);
       renderCombatUI();
 
+      // ── Admin reset/ban: this player's account is being wiped or banned
+      // while they were mid-fight (or a party/PvP-mate's was). No victory/
+      // death screen, no rewards — just tear the combat UI down instantly.
+      // For a reset, the save/gold/gear swap and zone transition for the
+      // target itself land separately via the "save_reset_push" message
+      // that follows this one. For a ban, the target's ws is closed by the
+      // server right after this message, so there's nothing further to wait for.
+      if(msg.outcome==="admin_reset"||msg.outcome==="admin_ban"){
+        endCombatUI();
+        if(!msg.actionTarget){
+          // A party member or PvP opponent — not the account actually being
+          // reset/banned. Their combat just vanished out from under them;
+          // explain why, in every log tab so nobody misses it.
+          const _actionWord=msg.outcome==="admin_ban"?"banned by an admin":"reset";
+          addLogAllTabs(`Combat ended, a participant's account was ${_actionWord}.`);
+          renderWorldNav();updateChatBar();
+        }
+        break;
+      }
+
       // ── PvP Arena combat end ──────────────────────────────────────────
       if(msg.isPvP||STATE._isPvP){
         const oppName=STATE._pvpOpponentName||"Opponent";
@@ -14930,15 +14973,46 @@ function _handlePartyWsMessage(msg){
         const eq=rp.equipment||{};
         rp.maxHp=(rp.baseMaxHp||100)+((eq.gear&&eq.gear.maxHp)||0)+(eq.accessories||[]).reduce((s,a)=>s+((a?.maxHp)||0),0);
         rp.hp=Math.min(rp.hp!=null?rp.hp:rp.maxHp,rp.maxHp);
+        // Belt-and-suspenders: the server sends an "admin_reset" combat_end
+        // first if this player was mid-fight, which already tears the combat
+        // UI down. If that message hasn't landed yet for any reason, force it
+        // now — a reset account has nothing to do with whatever fight is on
+        // screen, and there must be no victory/death screen here.
+        if(STATE.inCombat)endCombatUI();
         STATE.player=rp;
         if(STATE.stateRef)STATE.stateRef.player=rp;
         // Wipe cached bag/equipment-derived UI state so open panels don't show
         // stale items after the swap — same cache reset create_character relies on.
         STATE._profileCache={};STATE._profileCacheTs={};
-        saveGame(true);
-        renderTitleBar();
-        if(!STATE.inCombat)renderWorldNav();
-        addLog("system","Your character has been reset by an admin. Progress, gear, and stats are back to day one.");
+        // Move the player back to their (fresh) default zone through the same
+        // travel transition screen used for any other zone change — straight
+        // into the loading transition, no victory/death screen, out into the
+        // reset zone.
+        const respawnZoneId=rp.respawnZone||"safe_duskwatch";
+        const respawnZone=ZONES.find(z=>z.id===respawnZoneId)||ZONES[0];
+        if(respawnZone){
+          STATE.zone=respawnZone;
+          STATE.tab="world";
+          STATE.player={...STATE.player,lastZone:respawnZone.id};
+          if(STATE.stateRef)STATE.stateRef.player=STATE.player;
+          _broadcastZone(respawnZone.id);
+          renderTitleBar();
+          _showTravelOverlay();
+          _travelDestName=respawnZone.name;
+          showTravelScreen(respawnZone.name,respawnZone.safe,()=>{
+            _safeZoneHeal();
+            saveGame(true);
+            addLog("system","Your character has been reset by an admin. Progress, gear, and stats are back to day one.");
+            renderWorldNav();updateChatBar();
+          },respawnZone.id);
+        } else {
+          // No zone catalog available (extremely unlikely) — fall back to an
+          // instant swap so the reset still lands even without the transition.
+          saveGame(true);
+          renderTitleBar();
+          if(!STATE.inCombat)renderWorldNav();
+          addLog("system","Your character has been reset by an admin. Progress, gear, and stats are back to day one.");
+        }
       }
       break;
     }
@@ -18538,6 +18612,19 @@ function _hidePwResetOverlay(){
   if(window._vkbClose)window._vkbClose();
 }
 
+// ── Account Suspended Overlay (shown when logging into a banned account) ──
+function _showBanNoticeOverlay(){
+  const ov=el("ban-notice-overlay");
+  if(!ov)return;
+  ov.style.display="flex";
+  const btn=el("ban-notice-ok");
+  if(btn)btn.onclick=function(){_hideBanNoticeOverlay();};
+}
+function _hideBanNoticeOverlay(){
+  const ov=el("ban-notice-overlay");
+  if(ov)ov.style.display="none";
+}
+
 function openFriendAddPopup(){
   const overlay=document.getElementById("friend-add-overlay");
   if(!overlay)return;
@@ -20464,6 +20551,7 @@ function setupLogin(){
         const msg=authRes.error.message||"";
         if(msg==="TIMEOUT"||msg.includes("Not connected")){showErr("Cannot connect to server. Please try again.");return false;}
         if(msg==="invalid_credentials"){_flashPwBorder();return false;}
+        if(msg==="banned"){_flashPwBorder();_showBanNoticeOverlay();return false;}
         showErr("Login failed: "+msg);return false;
       }
       _authToken=authRes.token;_myUid=authRes.uid;
@@ -22024,6 +22112,7 @@ document.addEventListener("selectionchange",()=>{
     if(t.closest("#arena-confirm-overlay"))return;
     if(t.closest("#admin-lookup-overlay"))return;
     if(t.closest("#admin-warn-overlay"))return;
+    if(t.closest("#ban-notice-overlay"))return;
     if(t.closest(".enemy-card")||t.closest("#player-card")||t.closest(".party-slot"))return;
     if(t.closest("#stats-btn"))return;
     if(t.closest("#fishing-overlay"))return;
@@ -22747,6 +22836,7 @@ document.addEventListener("selectionchange",()=>{
     if(e.target.closest("#pw-reset-overlay")) return;
     if(e.target.closest("#admin-lookup-overlay")) return;
     if(e.target.closest("#admin-warn-overlay")) return;
+    if(e.target.closest("#ban-notice-overlay")) return;
     if(e.target.closest("#party-invite-overlay")) return;
     if(e.target.closest("#guild-invite-overlay")) return;
     if(e.target.closest("#guild-create-overlay")) return;
@@ -22863,6 +22953,12 @@ document.addEventListener("selectionchange",()=>{
     <div id="pw-reset-confirm" class="vfield" data-vfield="resetpwc" data-placeholder="Confirm password" data-maxlen="64" style="background:#000;border:1px solid #555;border-radius:4px;width:100%;box-sizing:border-box;"></div>
     <div id="pw-reset-err" style="display:none;font-size:10px;color:#cc2020;font-family:'Courier New',monospace;text-align:center;"></div>
     <button id="pw-reset-submit" style="padding:12px;background:#000;border:1px solid #cc8800;border-radius:4px;color:#cc8800;font-size:11px;letter-spacing:3px;font-family:'Courier New',monospace;font-weight:bold;-webkit-tap-highlight-color:transparent;">CONFIRM</button>
+  </div>
+</div>
+<div id="ban-notice-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9500;align-items:center;justify-content:center;">
+  <div style="background:#0a0a0a;border:1px solid #cc2020;border-radius:6px;width:85%;max-width:320px;padding:20px 18px;display:flex;flex-direction:column;gap:12px;">
+    <div style="font-size:12px;letter-spacing:3px;color:#cc2020;font-family:'Courier New',monospace;text-align:center;font-weight:bold;">Account Suspended</div>
+    <button id="ban-notice-ok" style="padding:12px;background:#000;border:1px solid #cc2020;border-radius:4px;color:#cc2020;font-size:11px;letter-spacing:3px;font-family:'Courier New',monospace;font-weight:bold;-webkit-tap-highlight-color:transparent;">OK</button>
   </div>
 </div>
 <div id="admin-lookup-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:8000;align-items:center;justify-content:center;">
@@ -22996,6 +23092,8 @@ document.addEventListener("selectionchange",()=>{
     "pruneold",
     "removeadmin <username>",
     "removedev <username>",
+    "resetaccount <username>",
+    "resetaccount all",
     "restore <charname> <snapshotid>",
     "room <roomid>",
     "rooms",
