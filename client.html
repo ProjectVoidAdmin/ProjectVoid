@@ -2035,9 +2035,6 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
     <div style="width:100%;height:2px;background:#111;border-radius:2px;overflow:hidden;position:relative;">
       <div style="position:absolute;top:0;left:0;width:30%;height:100%;background:#333;border-radius:2px;animation:rc-bar-loop 1.4s ease-in-out infinite;"></div>
     </div>
-    <div id="rc-timeout-msg" style="display:none;margin-top:24px;font-size:10px;color:#444;letter-spacing:2px;font-family:'Courier New',monospace;line-height:1.7;text-align:center;">Taking longer than expected.<br>
-      <button id="rc-logout-btn" style="margin-top:12px;padding:10px 20px;background:#000;border:1px solid #333;border-radius:4px;color:#555;font-size:10px;letter-spacing:3px;font-family:'Courier New',monospace;cursor:pointer;">LOG OUT</button>
-    </div>
   </div>
 </div>
 <style>
@@ -12910,8 +12907,8 @@ window.addEventListener("focus",_wsReconnectOnForeground);
 window.addEventListener("pageshow",_wsReconnectOnForeground);
 
 // ── Reconnect screen ──────────────────────────────────────────────────────────
-let _rcTimeoutTimer=null;
 let _rcShowing=false;
+let _rcGiveUpTimer=null;
 
 function _showReconnectScreen(){
   if(_rcShowing)return;
@@ -12921,23 +12918,25 @@ function _showReconnectScreen(){
   // Set sub-message if player was in combat
   const sub=document.getElementById("rc-sub");
   if(sub) sub.textContent=STATE.inCombat?"Restoring combat session...":"";
-  const tmsg=document.getElementById("rc-timeout-msg");
-  if(tmsg) tmsg.style.display="none";
   ov.style.display="flex";
-  // 30-second timeout message
-  if(_rcTimeoutTimer){clearTimeout(_rcTimeoutTimer);_rcTimeoutTimer=null;}
-  _rcTimeoutTimer=setTimeout(()=>{
-    const t=document.getElementById("rc-timeout-msg");
-    if(t) t.style.display="block";
-    const btn=document.getElementById("rc-logout-btn");
-    if(btn) btn.onclick=()=>{ if(typeof doLogout==="function")doLogout(); };
-  },30000);
+  // This screen just stays on "Reconnecting..." for as long as it takes -
+  // the reconnect logic itself (ws.onclose backoff + foreground-triggered
+  // retry) keeps trying in the background regardless of how long this has
+  // been showing. But if 10 minutes pass with no successful reconnect (dead
+  // network, server down, etc.), there's no point leaving the player stuck
+  // on this screen forever - drop them back to the sign-in screen instead.
+  if(_rcGiveUpTimer){clearTimeout(_rcGiveUpTimer);_rcGiveUpTimer=null;}
+  _rcGiveUpTimer=setTimeout(()=>{
+    _rcGiveUpTimer=null;
+    if(!_rcShowing)return; // already reconnected
+    if(typeof doLogout==="function")doLogout();
+  },600000);
 }
 
 function _hideReconnectScreen(){
   if(!_rcShowing)return;
   _rcShowing=false;
-  if(_rcTimeoutTimer){clearTimeout(_rcTimeoutTimer);_rcTimeoutTimer=null;}
+  if(_rcGiveUpTimer){clearTimeout(_rcGiveUpTimer);_rcGiveUpTimer=null;}
   if(window._rcDelayTimer){clearTimeout(window._rcDelayTimer);window._rcDelayTimer=null;}
   const ov=document.getElementById("reconnect-overlay");
   if(!ov)return;
