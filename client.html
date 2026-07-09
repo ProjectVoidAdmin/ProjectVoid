@@ -2349,8 +2349,31 @@ button { -webkit-tap-highlight-color: transparent !important; touch-action: mani
   //     regardless of whether any JS event fires
   window._pvLastRaf=Date.now();
   (function _pvRafTick(){ window._pvLastRaf=Date.now(); requestAnimationFrame(_pvRafTick); })();
+  // window._pvNativeBackgrounded is an authoritative override set by the
+  // standalone app's native Activity lifecycle (TaifunTools1.ActivityStateChanged
+  // -> CustomWebView1.EvaluateJavaScript -> window._pvNativePause/_pvNativeResume,
+  // see the App Inventor blocks). It's OR'd into _pvIsBackgrounded() alongside
+  // the JS-side signals below rather than replacing them: native lifecycle
+  // events are the fastest and most reliable signal available (driven by
+  // Android itself, unaffected by any WebView JS throttling), but this stays
+  // pure browser tabs (no App Inventor blocks to call it) and as a safety net
+  // in case the native call is ever missed on some device/OEM WebView build.
+  window._pvNativeBackgrounded=false;
   window._pvIsBackgrounded=function(){
-    return document.hidden||!document.hasFocus()||(Date.now()-window._pvLastRaf)>3000;
+    return window._pvNativeBackgrounded||document.hidden||!document.hasFocus()||(Date.now()-window._pvLastRaf)>3000;
+  };
+  // Called from the App Inventor blocks (via EvaluateJavaScript) the instant
+  // Android's Activity.onPause()/onStop() fires - i.e. immediately on
+  // minimize/switch-away, not on the next 1.5s watchdog tick.
+  window._pvNativePause=function(){
+    window._pvNativeBackgrounded=true;
+    if(typeof _pauseMusicForBackground==="function")_pauseMusicForBackground();
+  };
+  // Called from the App Inventor blocks the instant Activity.onResume() fires.
+  window._pvNativeResume=function(){
+    window._pvNativeBackgrounded=false;
+    if(typeof _resumeInterruptedMedia==="function")_resumeInterruptedMedia();
+    if(typeof _wsReconnectOnForeground==="function")_wsReconnectOnForeground();
   };
   function _forceFullscreen(){
     if(_pvIsNativeApp){_lockPortrait();return false;}
