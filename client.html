@@ -14635,19 +14635,14 @@ function _handlePartyWsMessage(msg){
         const oppName=STATE._pvpOpponentName||"Opponent";
         const isVictory=msg.outcome==="victory";
         const isForfeit=!!msg.forfeit;
-        // Update arena stats locally to match what server saved
+        // Arena stats (wins/losses/rating) are NOT recomputed here. The server
+        // is the sole source of truth for those and already pushed the correct
+        // post-match values via the "arena_rating_update" message, which always
+        // arrives just before this "combat_end" message. Re-deriving them again
+        // here previously double-counted the win/loss and applied a different
+        // (wrong) rating delta than the server, silently corrupting MMR every
+        // match. Just carry forward whatever is already in STATE.
         const _arenaStats={...(STATE.player.stats&&STATE.player.stats.arena||{})};
-        const _arenaMode=STATE._lastArenaMode||"1v1";
-        const _wKey=`wins${_arenaMode}`;
-        const _lKey=`losses${_arenaMode}`;
-        const _rKey=`rating${_arenaMode}`;
-        if(isVictory){
-          _arenaStats[_wKey]=(_arenaStats[_wKey]||0)+1;
-          _arenaStats[_rKey]=Math.max(0,(_arenaStats[_rKey]??1000)+10);
-        } else {
-          _arenaStats[_lKey]=(_arenaStats[_lKey]||0)+1;
-          _arenaStats[_rKey]=Math.max(0,(_arenaStats[_rKey]??1000)-5);
-        }
         updatePlayer(pp=>({...pp,hp:pp.maxHp,energy:0,cooldowns:{},isAlive:true,stats:{...(pp.stats||{}),arena:_arenaStats}}));
         // Dismiss the PvP match overlay if still showing
         const matchOv=el("pvp-match-overlay");
@@ -14921,6 +14916,29 @@ function _handlePartyWsMessage(msg){
           addLog("system","Your password has been reset for security. Please set a new password now.");
           _showPwResetOverlay();
         }
+      }
+      break;
+    }
+    // Pushed by the "resetaccount" admin terminal command — same live full-state
+    // swap as save_restored above, but for a full account reset. The player is
+    // NOT disconnected; this lands mid-session and everything (gold, gear,
+    // inventory, stats, action bar) visibly resets in place. Login/username and
+    // character name are untouched — only save.player content changes.
+    case "save_reset_push":{
+      if(msg.save&&msg.save.player){
+        const rp=msg.save.player;
+        const eq=rp.equipment||{};
+        rp.maxHp=(rp.baseMaxHp||100)+((eq.gear&&eq.gear.maxHp)||0)+(eq.accessories||[]).reduce((s,a)=>s+((a?.maxHp)||0),0);
+        rp.hp=Math.min(rp.hp!=null?rp.hp:rp.maxHp,rp.maxHp);
+        STATE.player=rp;
+        if(STATE.stateRef)STATE.stateRef.player=rp;
+        // Wipe cached bag/equipment-derived UI state so open panels don't show
+        // stale items after the swap — same cache reset create_character relies on.
+        STATE._profileCache={};STATE._profileCacheTs={};
+        saveGame(true);
+        renderTitleBar();
+        if(!STATE.inCombat)renderWorldNav();
+        addLog("system","Your character has been reset by an admin. Progress, gear, and stats are back to day one.");
       }
       break;
     }
