@@ -2477,7 +2477,33 @@ const ACTIONS_DB={
   flee:{id:"flee",name:"Flee",damage:null,difficulty:35,cooldown:15000,description:"Attempt to escape from combat.",isFlee:true,actionType:"core"},
   provisions:{id:"provisions",name:"Provision",damage:null,difficulty:null,cooldown:60000,description:"Use one of your provisions during combat.",isProvisions:true,actionType:"core"},
 };
-// Player actions are loaded live from the server via LIVE_ITEMS
+// Player actions are loaded live from the server via LIVE_ITEMS. Mirror any
+// action-category item into ACTIONS_DB so combat code that reads
+// ACTIONS_DB[aId] (gear-type gating, cooldown display, alignment gating,
+// etc.) sees the action's real data instead of silently falling back to
+// Basic Attack's. Call this any time LIVE_ITEMS gains or updates an item —
+// cheap no-op for non-action items.
+function _syncActionIntoDb(item){
+  if(!item||!item.id)return;
+  if(item.category!=="action"&&item.type!=="action")return;
+  ACTIONS_DB[item.id]={
+    id:item.id, name:item.name||item.id,
+    damage:Array.isArray(item.damage)?item.damage:[0,0],
+    difficulty:item.difficulty??20,
+    cooldown:item.cooldown||0,
+    requiresGearType:item.requiresGearType||null,
+    targeting:item.targeting||"enemy",
+    alignment:item.alignment||"hostile",
+    description:item.description||"",
+    actionType:item.actionType||"custom",
+  };
+}
+// Companion to _syncActionIntoDb — removes an action from ACTIONS_DB when its
+// item is deleted from the catalog. Never touches the 3 core hardcoded ids.
+function _removeActionFromDb(id){
+  if(!id||id==="basic_attack"||id==="flee"||id==="provisions")return;
+  delete ACTIONS_DB[id];
+}
 const ENEMIES_DB={
   // Enemies are loaded live from the server via dev_entities
 };
@@ -2609,7 +2635,7 @@ function _catalogLoadFromCache() {
     const r = JSON.parse(localStorage.getItem(_CACHE_KEY_ITEMS) || 'null');
     if (r && Array.isArray(r.data)) {
       window.LIVE_ITEMS = window.LIVE_ITEMS || {};
-      for (const item of r.data) { if (item && item.id) window.LIVE_ITEMS[item.id] = item; }
+      for (const item of r.data) { if (item && item.id) { window.LIVE_ITEMS[item.id] = item; _syncActionIntoDb(item); } }
     }
   } catch(e) {}
   // Populate ZONES from localStorage
@@ -2672,7 +2698,7 @@ function _catalogSaveItems(items, version) {
   // Merge into LIVE_ITEMS if items array provided (full reload path)
   if (items) {
     window.LIVE_ITEMS = window.LIVE_ITEMS || {};
-    for (const item of items) { if (item && item.id) window.LIVE_ITEMS[item.id] = item; }
+    for (const item of items) { if (item && item.id) { window.LIVE_ITEMS[item.id] = item; _syncActionIntoDb(item); } }
   }
   if (!version) return; // no version = memory-only, don't persist
   clearTimeout(_catalogItemsWriteTimer);
@@ -5423,6 +5449,8 @@ var _DEV_FIELDS = {
     {k:'rarity',       l:'Rarity',             t:'select', req:true, opts:['Common','Uncommon','Rare','Epic','Legendary','Mythic']},
     {k:'provisionType',l:'Provision Type',      t:'select', req:true, opts:['Food','Potion','Crafting Recipe']},
     {k:'combatUsable', l:'Usable In Combat',    t:'select', req:true, opts:['Yes','No']},
+    {k:'targeting',    l:'Targeting',           t:'select', req:true,
+      opts:['Self','Friendly','All Friendly','Hostile','All Hostiles']},
     {k:'marketValue',  l:'Market Value (gold)', t:'number', min:0},
     {k:'_effects',     l:'Effects',             t:'effectbox'},
     {k:'description',  l:'Description',          t:'textarea', ph:''},
@@ -10274,6 +10302,11 @@ function _devValidate(data,tab){
   var BOX_TYPES=new Set(['lootbox','hostileactionsbox','phasesbox','assignmentsbox','subzonesbox','objectivesbox','branchbox','triggersbox','rewardsbox','fishbehaviorbox','effectbox','marketbox']);
   var VALID_RARITIES=['Common','Uncommon','Rare','Epic','Legendary','Mythic'];
   var VALID_TARGETING=['enemy','self','ally','area_enemy','area_ally','area_all','random_enemy','random_ally'];
+  // Coarse hostile/friendly targeting dropdown used on the top-level Action
+  // and Provision forms (distinct from the granular per-effect VALID_TARGETING
+  // above). Maps 1:1 to a {targetingMode, alignment} pair server-side — see
+  // _normalizeCoarseTargeting in server.js.
+  var VALID_ACTION_TARGETING=['Self','Friendly','All Friendly','Hostile','All Hostiles'];
   var VALID_ACTION_TYPES=['Brutality','Lethality','Guardian','Restoration','Destruction','Marksmanship'];
   var VALID_EFFECT_TYPES=['damage','dot','heal','hot','energy_stop','eot','shield','stat_mod','buff','debuff','healing'];
   var VALID_EFFECT_TARGETS=['self','ally','area_ally','random_ally','enemy','area_enemy','area_all','random_enemy'];
@@ -10489,6 +10522,11 @@ function _devValidate(data,tab){
     if(!provEffects.length)
       warnings.push('Provision has no effects \u2014 it will do nothing when used. Add at least one healing or buff effect.');
     provEffects.forEach(function(eff,i){ _validateEffect(eff,'Provision effect '+(i+1)); });
+    if(!data.targeting) {
+      issues.push('Targeting is required.');
+    } else if(VALID_ACTION_TARGETING.indexOf(data.targeting)<0) {
+      issues.push('Targeting "'+data.targeting+'" is not valid. Must be one of: '+VALID_ACTION_TARGETING.join(', ')+'.');
+    }
     // Crafting Recipe with combatUsable flag is pointless
     if(data.provisionType==='Crafting Recipe'&&data.combatUsable===true)
       warnings.push('Provision type is "Crafting Recipe" but is marked as usable in combat \u2014 recipes cannot be used in combat.');
@@ -10535,8 +10573,8 @@ function _devValidate(data,tab){
     }
     if(!data.targeting) {
       issues.push('Targeting is required.');
-    } else if(VALID_TARGETING.indexOf(data.targeting)<0) {
-      issues.push('Targeting "'+data.targeting+'" is not valid. Must be one of: '+VALID_TARGETING.join(', ')+'.');
+    } else if(VALID_ACTION_TARGETING.indexOf(data.targeting)<0) {
+      issues.push('Targeting "'+data.targeting+'" is not valid. Must be one of: '+VALID_ACTION_TARGETING.join(', ')+'.');
     }
     // Heal/buff targeting enemy is suspicious
     var actEffects=Array.isArray(data._effects)?data._effects:[];
@@ -12045,7 +12083,7 @@ function _buildEnemyCard(e){
   div.className="enemy-card"+(targeted?" targeted":"")+(e.isAlive?"":" dead")+(e.uid===STATE.strikingUid?" striking":"");
   if(e.isAlive)addTargetTap(div,()=>{STATE.targetUid=e.uid;renderCombatUI();});
   const hpPct=clamp((e.hp/e.maxHp)*100,0,100);
-  div.innerHTML=`<div class="enemy-name">${e.name}${targeted&&e.isAlive?'<span class="tgt-arrow">&lt;</span>':""}</div>
+  div.innerHTML=`<div class="enemy-name">${e.name}</div>
     <div class="enemy-bar-bg"><div class="enemy-bar-fill" style="width:${hpPct}%;background:${e.isAlive?"#cc2020":"#333"};"></div></div>
     <div class="enemy-hp-txt">${e.hp}/${e.maxHp}</div>`;
   div.dataset.lastHp=String(e.hp);
@@ -12211,7 +12249,9 @@ function renderPartySlots(){
       slot.innerHTML=`<div style="font-size:9px;color:#444;letter-spacing:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;">${displayName}</div><div style="font-size:8px;color:#555;margin-top:2px;letter-spacing:2px;">OFFLINE</div>`;
     }
   }
-  // Wire onclick on all occupied party slots to open the unified character popup
+  // Wire onclick on all occupied party slots — in combat this selects the
+  // member as your target (green glow, just like self); outside combat it
+  // still opens the unified character popup as before.
   for(let i=2;i<=4;i++){
     const slot=document.getElementById("party-slot-"+i);
     if(!slot)continue;
@@ -12227,6 +12267,11 @@ function renderPartySlots(){
     const _slotChar=slotMember.charName||slotMember.username;
     slot.style.cursor="pointer";
     slot.onclick=function(){
+      if(STATE.inCombat){
+        STATE.targetUid=slotMember.uid;
+        renderCombatUI();
+        return;
+      }
       const _accts=DB.getAccountsCache();
       const _acc=_accts[_slotUname]||null;
       const _dn=(_acc&&_acc.charName)||_slotChar;
@@ -12235,6 +12280,14 @@ function renderPartySlots(){
         isPartyMember:true
       });
     };
+    // Targeted border overlay — applied every render (not cached by slotKey)
+    // so it always reflects the current target, same treatment as the
+    // enemy-card red glow and the player-card's own self-targeted green glow.
+    if(STATE.inCombat&&slotMember.uid&&STATE.targetUid===slotMember.uid){
+      slot.style.setProperty("border","2px solid #44ee44","important");
+    } else {
+      slot.style.removeProperty("border");
+    }
   }
 }
 function renderCombatUI(){
@@ -12281,9 +12334,14 @@ function renderCombatUI(){
   // enemy grid - diff-update in place: full rebuild only on slot count change, else patch each card
   const grid=el("enemy-grid");
   const enemies=STATE.combatEnemies||[];
-  // Auto-retarget: if current target is dead or unset, switch to first alive enemy
+  // Auto-retarget: if current target is dead or unset, switch to first alive
+  // enemy — but never clobber a deliberate self/party-member target (those
+  // aren't found in the enemies list at all, so the naive check below would
+  // otherwise always look "invalid" and bounce back to an enemy).
+  const _isSelfTarget=STATE.targetUid==="__self__";
+  const _isPartyTarget=!!(STATE.party||[]).find(m=>m.uid===STATE.targetUid);
   const _curTarget=enemies.find(e=>e.uid===STATE.targetUid);
-  if(!_curTarget||!_curTarget.isAlive){
+  if(!_isSelfTarget&&!_isPartyTarget&&(!_curTarget||!_curTarget.isAlive)){
     const _nextAlive=enemies.find(e=>e.isAlive);
     STATE.targetUid=_nextAlive?_nextAlive.uid:null;
   }
@@ -12299,14 +12357,6 @@ function renderCombatUI(){
       const targeted=e.uid===STATE.targetUid;
       const newCls="enemy-card"+(targeted?" targeted":"")+(e.isAlive?"":" dead")+(e.uid===STATE.strikingUid?" striking":"");
       if(card.className!==newCls)card.className=newCls;
-      // Sync target arrow without full innerHTML rewrite
-      const nameDiv=card.querySelector(".enemy-name");
-      if(nameDiv){
-        const hasArrow=!!nameDiv.querySelector(".tgt-arrow");
-        const wantArrow=targeted&&e.isAlive;
-        if(wantArrow&&!hasArrow){const a=document.createElement("span");a.className="tgt-arrow";a.textContent="<";nameDiv.appendChild(a);}
-        else if(!wantArrow&&hasArrow){nameDiv.querySelector(".tgt-arrow").remove();}
-      }
       // Sync HP bar + text only. Damage popups and bar-flash are handled
       // exclusively by _replayVisualEvent via the WebSocket event listener.
       // No popup here - avoids double damage numbers.
@@ -13323,7 +13373,7 @@ function _handlePartyWsMessage(msg){
     // Merges into LIVE_ITEMS and ENEMIES_DB exactly like live_items/live_hostiles.
     if(Array.isArray(msg.items)&&msg.items.length){
       window.LIVE_ITEMS=window.LIVE_ITEMS||{};
-      msg.items.forEach(item=>{if(item&&item.id){ if(msg._slim)item._slim=true; window.LIVE_ITEMS[item.id]=item; }});
+      msg.items.forEach(item=>{if(item&&item.id){ if(msg._slim)item._slim=true; window.LIVE_ITEMS[item.id]=item; _syncActionIntoDb(item); }});
       if(msg.itemsV){ _catalogSaveItems(null, msg.itemsV); }
       if(typeof renderMarketPopup==="function"&&document.getElementById("popup")?.classList.contains("show")&&document.getElementById("popup-title")?.textContent==="MARKET"){
         renderMarketPopup();
@@ -13403,7 +13453,7 @@ function _handlePartyWsMessage(msg){
       // LIVE_ITEMS grows as the player explores — items already received are
       // never re-sent. The _zone field on the message is informational only.
       // Tag slim items so showItemDetail knows to fetch full data before rendering.
-      arr.forEach(item=>{if(item&&item.id){ if(msg._slim)item._slim=true; window.LIVE_ITEMS[item.id]=item; }});
+      arr.forEach(item=>{if(item&&item.id){ if(msg._slim)item._slim=true; window.LIVE_ITEMS[item.id]=item; _syncActionIntoDb(item); }});
       // Save to localStorage cache (atomic: data + version together)
       if(msg._version){ _catalogSaveItems(null, msg._version); }
       // Re-render market if open
@@ -13423,6 +13473,7 @@ function _handlePartyWsMessage(msg){
       window.LIVE_ITEMS=window.LIVE_ITEMS||{};
       msg.item._slim=false; // mark as fully loaded
       window.LIVE_ITEMS[msg.item.id]=msg.item;
+      _syncActionIntoDb(msg.item);
       // Fire any pending callbacks waiting for this item
       const _cb=window._itemDetailCallbacks&&window._itemDetailCallbacks[msg.item.id];
       if(_cb){ delete window._itemDetailCallbacks[msg.item.id]; try{_cb(msg.item);}catch(e){} }
@@ -13436,7 +13487,7 @@ function _handlePartyWsMessage(msg){
     if(Array.isArray(msg.items)){
       window.LIVE_ITEMS=window.LIVE_ITEMS||{};
       msg.items.forEach(item=>{
-        if(item&&item.id){ item._slim=false; window.LIVE_ITEMS[item.id]=item; }
+        if(item&&item.id){ item._slim=false; window.LIVE_ITEMS[item.id]=item; _syncActionIntoDb(item); }
       });
     }
     return;
@@ -13475,13 +13526,13 @@ function _handlePartyWsMessage(msg){
     // Upsert new/changed items
     if(Array.isArray(msg.upsertedItems)&&msg.upsertedItems.length){
       window.LIVE_ITEMS=window.LIVE_ITEMS||{};
-      msg.upsertedItems.forEach(item=>{if(item&&item.id){ if(msg._slim)item._slim=true; window.LIVE_ITEMS[item.id]=item; }});
+      msg.upsertedItems.forEach(item=>{if(item&&item.id){ if(msg._slim)item._slim=true; window.LIVE_ITEMS[item.id]=item; _syncActionIntoDb(item); }});
       itemsDirty=true;
     }
     // Delete removed items
     if(Array.isArray(msg.deletedItems)&&msg.deletedItems.length){
       window.LIVE_ITEMS=window.LIVE_ITEMS||{};
-      msg.deletedItems.forEach(id=>{if(id)delete window.LIVE_ITEMS[id];});
+      msg.deletedItems.forEach(id=>{if(id){delete window.LIVE_ITEMS[id];_removeActionFromDb(id);}});
       itemsDirty=true;
     }
     // Upsert new/changed zones
@@ -15159,30 +15210,57 @@ function playerAct(slotIdx){
 
   // ── All combat: route through WebSocket ────────────────────────────────────
   if(_partyWs&&_partyWs.readyState===1){
+    if(ability.isFlee){
+      const p={...st.player,energy:st.player.energy-80,cooldowns:{...st.player.cooldowns,[aId]:now+(ability.cooldown||0)}};
+      st.player=p;STATE.player=p;
+      _partyWs.send(JSON.stringify({type:"flee"}));
+      renderCombatUI();
+      return;
+    }
+    // Figure out what's actually selected right now — an enemy, yourself, or
+    // a party member — then apply the same hostile/friendly rule the server
+    // enforces: a hostile ability can never land on yourself or a party
+    // member (no fallback — pick an enemy instead), while a friendly ability
+    // used on a hostile target simply redirects to yourself automatically.
+    const targetedEnemy=alive.find(e=>e.uid===STATE.targetUid)||null;
+    const targetedSelf=STATE.targetUid==="__self__";
+    const targetedPartyMember=(STATE.party||[]).find(m=>m.uid===STATE.targetUid)||null;
+    const alignment=ability.alignment==="friendly"?"friendly":ability.alignment==="hostile"?"hostile":(["self","ally","area_ally","random_ally"].includes(ability.targeting)?"friendly":"hostile");
+    if(alignment==="hostile"&&(targetedSelf||targetedPartyMember)){
+      addLog("combat_info",`${ability.name} can't be used on yourself or a party member.`);
+      return;
+    }
+    // Resolve the effective target uid: friendly abilities redirect to self
+    // whenever the current selection isn't yourself or an ally.
+    let effectiveUid;
+    if(alignment==="friendly"&&!targetedSelf&&!targetedPartyMember) effectiveUid=STATE.player.uid;
+    else if(targetedSelf) effectiveUid=STATE.player.uid;
+    else if(targetedPartyMember) effectiveUid=targetedPartyMember.uid;
+    else if(targetedEnemy) effectiveUid=targetedEnemy.uid;
+    else effectiveUid=alive[0]?alive[0].uid:null;
+    if(!effectiveUid)return;
+
     // Optimistic local update for responsiveness
     const p={...st.player,energy:st.player.energy-80,cooldowns:{...st.player.cooldowns,[aId]:now+(ability.cooldown||0)}};
     st.player=p;STATE.player=p;
-    if(ability.isFlee){
-      _partyWs.send(JSON.stringify({type:"flee"}));
-    } else {
-      const target=alive.find(e=>e.uid===STATE.targetUid)||alive[0];
-      if(!target)return;
-      // Send ti (target slot index) for compact upload; fall back to tu for servers without slot map
-      // Validate _ti against current enemies to guard against stale slot map after reconnect
-      const _tiRaw=STATE._combatSlotByUid?STATE._combatSlotByUid[target.uid]:null;
-      const _tiValid=_tiRaw!=null&&STATE.combatEnemies&&STATE.combatEnemies.some(e=>e.uid===target.uid);
-      const _ti=_tiValid?_tiRaw:null;
-      _partyWs.send(JSON.stringify(_ti!=null?{type:"action",a:aId,ti:_ti}:{type:"action",a:aId,tu:target.uid}));
-      // Show local combat line for responsiveness
-      _ensureEnemyGrid();
-      const _toCard=document.querySelector(`.enemy-card[data-uid="${target.uid}"]`);
-      const _fromCard=el("player-card");
-      if(_toCard&&_fromCard){
-        showAttackLine(_fromCard,_toCard,"#44ee44");
-        _fromCard.classList.remove("striking");void _fromCard.offsetWidth;
-        _fromCard.classList.add("striking");
-        setTimeout(()=>_fromCard.classList.remove("striking"),400);
-      }
+
+    // Send ti (target slot index) for compact upload; fall back to tu for servers without slot map.
+    // Validate _ti against the current slot map to guard against a stale map after reconnect.
+    const _tiRaw=STATE._combatSlotByUid?STATE._combatSlotByUid[effectiveUid]:null;
+    const _tiValid=_tiRaw!=null;
+    const _ti=_tiValid?_tiRaw:null;
+    _partyWs.send(JSON.stringify(_ti!=null?{type:"action",a:aId,ti:_ti}:{type:"action",a:aId,tu:effectiveUid}));
+    // Show local combat line for responsiveness
+    _ensureEnemyGrid();
+    const _fromCard=el("player-card");
+    const _toCard=effectiveUid===STATE.player.uid?_fromCard:(STATE._partySlotEls&&STATE._partySlotEls[effectiveUid])||document.querySelector(`.enemy-card[data-uid="${effectiveUid}"]`);
+    if(_toCard&&_fromCard&&_toCard!==_fromCard){
+      showAttackLine(_fromCard,_toCard,"#44ee44");
+    }
+    if(_fromCard){
+      _fromCard.classList.remove("striking");void _fromCard.offsetWidth;
+      _fromCard.classList.add("striking");
+      setTimeout(()=>_fromCard.classList.remove("striking"),400);
     }
     renderCombatUI();
     return;
