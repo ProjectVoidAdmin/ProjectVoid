@@ -3286,17 +3286,36 @@ function _processInboxData(inbox){
   }
 
   // ── Process system messages (account resets, admin warnings, etc.) ──
+  // Unlike the other categories above, these are NOT deleted on receipt —
+  // they stay in the server inbox (and in STATE._systemNotifs) until the
+  // player dismisses them from the Notifications popup, so a reset/warning
+  // sent while offline is still waiting for them at next login.
   const sysMsgs=inbox.system||{};
   if(typeof sysMsgs==="object"){
     const sysKeys=Object.keys(sysMsgs).filter(k=>sysMsgs[k]);
     if(sysKeys.length>0){
-      // Oldest first, in case more than one arrived since last login
       sysKeys.sort((a,b)=>((sysMsgs[a]&&sysMsgs[a].t)||0)-((sysMsgs[b]&&sysMsgs[b].t)||0));
+      let added=false;
       sysKeys.forEach(function(k){
-        const text=(sysMsgs[k]&&sysMsgs[k].m)?sysMsgs[k].m:"";
-        if(text)addLog("system","⚠ "+text);
+        const entry=sysMsgs[k];
+        const text=(entry&&entry.m)?entry.m:"";
+        if(!text)return;
+        if(!STATE._systemNotifs.find(n=>n.key===k)){
+          STATE._systemNotifs.push({key:k,m:text,t:entry.t||Date.now()});
+          added=true;
+        }
+        // Log to the SYSTEM chat tab once per key, separate from the popup's
+        // own dismiss-tracking so a re-sync (e.g. reconnect) never re-logs it.
+        if(!STATE._shownSystemKeys[k]){
+          STATE._shownSystemKeys[k]=true;
+          addLog("system","⚠ "+text);
+        }
       });
-      _wsSend({type:"delete_inbox_category",category:"system"});
+      if(added){
+        if(typeof _tbCache!=="undefined")_tbCache.notifN=-1;
+        if(typeof renderTitleBar==="function")renderTitleBar();
+        if(typeof _renderNotifPopup==="function")_renderNotifPopup();
+      }
     }
   }
 
@@ -4059,6 +4078,8 @@ let STATE={
   _partyCanonical:null,  // canonical join order (leader first, never mutated by presence)
   _shownInviteKeys:{},   // {key: true} - invite keys already shown to avoid re-prompting
   _sentInvites:{},       // {username: ts} - outgoing invite timestamps
+  _systemNotifs:[],      // [{key,m,t}] - undismissed system inbox messages (account resets, admin warnings)
+  _shownSystemKeys:{},   // {key: true} - system notif keys already logged to the SYSTEM tab (log once, even across re-syncs)
   _myVotedTs:0,          // ts of last vote we cast (deduplicate vote requests)
   _lastVoteTs:0,         // ts of last voteRequest we handled
   _followingPartyTravel:false,
@@ -4963,30 +4984,55 @@ function _renderNotifPopup(){
   const body=el("notif-body");
   if(!body)return;
   const pendingIn=(STATE.player&&STATE.player.pendingIn)||[];
-  if(!pendingIn.length){
+  const sysNotifs=STATE._systemNotifs||[];
+  if(!pendingIn.length&&!sysNotifs.length){
     body.innerHTML='<div style="color:#666;font-size:11px;padding:20px 0;text-align:center;letter-spacing:1px;">No notifications.</div>';
     return;
   }
-  let html='<div style="font-size:9px;letter-spacing:1px;color:#b0a888;margin-bottom:10px;">FRIEND REQUESTS</div>';
-  pendingIn.forEach(function(r){
-    const name=r.from||"";
-    const displayName=_capFirst(name);
-    html+='<div data-notif-row="'+name+'" style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #222;">'
-      +'<span style="font-size:12px;color:#fff;font-family:\'Courier New\',monospace;">'+displayName+'</span>'
-      +'<div style="display:flex;gap:6px;">'
-      +'<button class="popup-close" style="font-size:9px;padding:3px 9px;color:#44bb44;border-color:#44bb44;" data-notif-accept="'+name+'">ACCEPT</button>'
-      +'<button class="popup-close" style="font-size:9px;padding:3px 9px;color:#cc4444;border-color:#cc4444;" data-notif-decline="'+name+'">DECLINE</button>'
-      +'</div>'
-      +'</div>';
-  });
+  let html="";
+  if(sysNotifs.length){
+    html+='<div style="font-size:9px;letter-spacing:1px;color:#b0a888;margin-bottom:10px;">SYSTEM</div>';
+    sysNotifs.forEach(function(n){
+      html+='<div data-sysnotif-row="'+n.key+'" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 0;border-bottom:1px solid #222;">'
+        +'<span style="font-size:12px;color:#fff;font-family:\'Courier New\',monospace;">⚠ '+n.m+'</span>'
+        +'<button class="popup-close" style="font-size:9px;padding:3px 9px;color:#aaa;flex:none;" data-sysnotif-dismiss="'+n.key+'">OK</button>'
+        +'</div>';
+    });
+  }
+  if(pendingIn.length){
+    html+='<div style="font-size:9px;letter-spacing:1px;color:#b0a888;margin:10px 0;">FRIEND REQUESTS</div>';
+    pendingIn.forEach(function(r){
+      const name=r.from||"";
+      const displayName=_capFirst(name);
+      html+='<div data-notif-row="'+name+'" style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #222;">'
+        +'<span style="font-size:12px;color:#fff;font-family:\'Courier New\',monospace;">'+displayName+'</span>'
+        +'<div style="display:flex;gap:6px;">'
+        +'<button class="popup-close" style="font-size:9px;padding:3px 9px;color:#44bb44;border-color:#44bb44;" data-notif-accept="'+name+'">ACCEPT</button>'
+        +'<button class="popup-close" style="font-size:9px;padding:3px 9px;color:#cc4444;border-color:#cc4444;" data-notif-decline="'+name+'">DECLINE</button>'
+        +'</div>'
+        +'</div>';
+    });
+  }
   body.innerHTML=html;
+  body.querySelectorAll("[data-sysnotif-dismiss]").forEach(function(btn){
+    btn.addEventListener("pointerup",function(){
+      const key=btn.getAttribute("data-sysnotif-dismiss");
+      const row=body.querySelector('[data-sysnotif-row="'+key+'"]');
+      if(row)row.remove();
+      STATE._systemNotifs=(STATE._systemNotifs||[]).filter(n=>n.key!==key);
+      _wsSend({type:"delete_inbox_entry",category:"system",key:key});
+      if(typeof _tbCache!=="undefined")_tbCache.notifN=-1;
+      if(typeof renderTitleBar==="function")renderTitleBar();
+      if(!(STATE.player.pendingIn||[]).length&&!(STATE._systemNotifs||[]).length){el("notif-popup").classList.remove("show");setCombatOverlaysVisible(true);}
+    });
+  });
   body.querySelectorAll("[data-notif-accept]").forEach(function(btn){
     btn.addEventListener("pointerup",async function(){
       const from=btn.getAttribute("data-notif-accept");
       const row=body.querySelector('[data-notif-row="'+from+'"]');
       if(row)row.remove();
       await acceptFriendReq(from);
-      if(!(STATE.player.pendingIn||[]).length){el("notif-popup").classList.remove("show");setCombatOverlaysVisible(true);}
+      if(!(STATE.player.pendingIn||[]).length&&!(STATE._systemNotifs||[]).length){el("notif-popup").classList.remove("show");setCombatOverlaysVisible(true);}
       else _renderNotifPopup();
     });
   });
@@ -4996,7 +5042,7 @@ function _renderNotifPopup(){
       const row=body.querySelector('[data-notif-row="'+from+'"]');
       if(row)row.remove();
       await declineFriendReq(from);
-      if(!(STATE.player.pendingIn||[]).length){el("notif-popup").classList.remove("show");setCombatOverlaysVisible(true);}
+      if(!(STATE.player.pendingIn||[]).length&&!(STATE._systemNotifs||[]).length){el("notif-popup").classList.remove("show");setCombatOverlaysVisible(true);}
       else _renderNotifPopup();
     });
   });
@@ -5009,7 +5055,7 @@ let _tbCache={gold:-1,hp:-1,maxHp:-1,zone:"",title:"",name:"",notifN:-1};
 function renderTitleBar(){
   const p=STATE.player;
   const hpPct=p.maxHp>0?Math.round((p.hp/p.maxHp)*100):0;
-  const notifN=(p.pendingIn?.length||0)+(window._inviteQueue?.length||0)+(window._inviteQueueRunning?1:0);
+  const notifN=(p.pendingIn?.length||0)+(window._inviteQueue?.length||0)+(window._inviteQueueRunning?1:0)+(STATE._systemNotifs?.length||0);
   const zone=STATE.zone?.name||"";
   if(p.name!==_tbCache.name){el("disp-name").textContent=p.name;_tbCache.name=p.name;}
   if(p.title!==_tbCache.title){el("disp-title").textContent=p.title;_tbCache.title=p.title;}
@@ -17894,7 +17940,7 @@ function _buildDisplayOrder(canonicalOrder){
 function _resetPartyState(){
   _clearPartyListener();
   STATE.party=[];STATE.partyId=null;STATE.partyLeader=null;
-  STATE._shownInviteKeys={};STATE._sentInvites={};STATE._partyOrder=null;STATE._partyCanonical=null;
+  STATE._shownInviteKeys={};STATE._sentInvites={};STATE._partyOrder=null;STATE._partyCanonical=null;STATE._systemNotifs=[];STATE._shownSystemKeys={};
   STATE._myVotedTs=0;STATE._lastVoteTs=0;
   STATE._profileCache={};STATE._profileCacheTs={};
   STATE._followingPartyTravel=false;
@@ -20962,7 +21008,7 @@ async function doLogin(username){
   STATE.provisionCooldownEnd=null;STATE.targetUid=null;STATE.strikingUid=null;
   STATE.prevEnemyHp={};STATE.chatMode="zone";STATE.actionBtnHeld=false;
   STATE.party=[];STATE.partyId=null;STATE.partyLeader=null;STATE._myVotedTs=0;STATE._lastVoteTs=0;
-  STATE._shownInviteKeys={};STATE._sentInvites={};STATE._partyOrder=null;STATE._partyCanonical=null;
+  STATE._shownInviteKeys={};STATE._sentInvites={};STATE._partyOrder=null;STATE._partyCanonical=null;STATE._systemNotifs=[];STATE._shownSystemKeys={};
   STATE._profileCache={};STATE._profileCacheTs={};
   _clearPartySlotCache();
   // Clear presence caches and invite queue so previous session data never bleeds in
