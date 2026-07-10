@@ -8676,7 +8676,9 @@ function _devRenderMarketBox(container, tab, existingData) {
         var p = typeof existingData==='string' ? JSON.parse(existingData) : existingData;
         if(p && typeof p==='object') {
           ['equipment','action'].forEach(function(cat){
-            if(Array.isArray(p[cat])) _devS.marketData[tab][cat] = p[cat];
+            if(Array.isArray(p[cat])) _devS.marketData[tab][cat] = p[cat].map(function(x){
+              return typeof x==='string' ? {id:x} : x;
+            });
           });
         }
       } catch(e){}
@@ -8685,7 +8687,11 @@ function _devRenderMarketBox(container, tab, existingData) {
   var CATEGORY_LABELS = {equipment:'EQUIPMENT', action:'ACTIONS'};
   var CATS = ['equipment','action'];
   function _syncMarket() {
-    _devS.form['_market'] = JSON.stringify(_devS.marketData[tab]||{equipment:[],action:[]});
+    var _plain = {};
+    CATS.forEach(function(cat){
+      _plain[cat] = (_devS.marketData[tab][cat]||[]).map(function(x){ return typeof x==='string'?x:x.id; }).filter(Boolean);
+    });
+    _devS.form['_market'] = JSON.stringify(_plain);
   }
   function _render() {
     var data = _devS.marketData[tab];
@@ -10695,7 +10701,7 @@ function _devValidate(data,tab){
     if(zType==='Safe'){
       var mkt=data._market||{};
       var eqIds=Array.isArray(mkt.equipment)?mkt.equipment:[];
-      var actIds=Array.isArray(mkt.actions)?mkt.actions:[];
+      var actIds=Array.isArray(mkt.action)?mkt.action:[];
       if(!eqIds.length&&!actIds.length)
         warnings.push('Safe zone has an empty market \u2014 no equipment or actions will be sold here.');
       var liveEquip=_liveIds('gears').concat(_liveIds('accessories'));
@@ -14794,7 +14800,8 @@ function _handlePartyWsMessage(msg){
       // ── PvE combat end ────────────────────────────────────────────────
       if(msg.outcome==="victory"){
         STATE._hasFled=false;
-        addLog("ph",`Victory! +${msg.goldEach||0} gold.`);
+        addLog("ph",`Victory!`);
+        if(msg.goldEach>0)addLog("loot",`+ ${msg.goldEach} gold`);
         // Read actual final HP from server's members array (h = hp field from _projectMember)
         const _selfMember=msg.members&&msg.members.find(m=>m.uid===_myUid);
         const _finalHp=_selfMember&&_selfMember.h!=null?_selfMember.h:STATE.player.hp;
@@ -19518,8 +19525,9 @@ function renderMarketPopup(){
     const eqTabs=[{key:"gear",label:"Gear"},{key:"accessory",label:"Accessory"}];
     if(!eqTabs.some(t=>t.key===eqSubTab))eqSubTab="gear";
     bodyHtml+=`<div class="subtab-bar">${eqTabs.map(t=>`<button class="subtab-btn${eqSubTab===t.key?" active":""}" data-eqtab="${t.key}">${t.label}</button>`).join("")}</div>`;
-    const _liveEq=window.LIVE_ITEMS?Object.values(window.LIVE_ITEMS).filter(i=>(i.type==="gear"||i.type==="accessory")&&(i.zones||[]).includes(zoneId)):[];
-    const allEq=[..._liveEq,...MARKET_EQUIPMENT.gear,...MARKET_EQUIPMENT.accessory].filter(i=>!i.zones||i.zones.includes(zoneId));
+    const _zoneEquipmentIds=new Set((STATE.zone&&STATE.zone.market&&STATE.zone.market.equipment)||[]);
+    const _liveEq=window.LIVE_ITEMS?Object.values(window.LIVE_ITEMS).filter(i=>(i.type==="gear"||i.type==="accessory")&&((i.zones||[]).includes(zoneId)||_zoneEquipmentIds.has(i.id))):[];
+    const allEq=[..._liveEq,...MARKET_EQUIPMENT.gear,...MARKET_EQUIPMENT.accessory].filter(i=>!i.zones||i.zones.includes(zoneId)||_zoneEquipmentIds.has(i.id));
     const items=allEq.filter(item=>{
       if(eqSubTab==="gear")return item.type==="gear";
       if(eqSubTab==="accessory")return item.type==="accessory";
