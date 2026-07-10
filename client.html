@@ -3285,6 +3285,21 @@ function _processInboxData(inbox){
     }
   }
 
+  // ── Process system messages (account resets, admin warnings, etc.) ──
+  const sysMsgs=inbox.system||{};
+  if(typeof sysMsgs==="object"){
+    const sysKeys=Object.keys(sysMsgs).filter(k=>sysMsgs[k]);
+    if(sysKeys.length>0){
+      // Oldest first, in case more than one arrived since last login
+      sysKeys.sort((a,b)=>((sysMsgs[a]&&sysMsgs[a].t)||0)-((sysMsgs[b]&&sysMsgs[b].t)||0));
+      sysKeys.forEach(function(k){
+        const text=(sysMsgs[k]&&sysMsgs[k].m)?sysMsgs[k].m:"";
+        if(text)addLog("system","⚠ "+text);
+      });
+      _wsSend({type:"delete_inbox_category",category:"system"});
+    }
+  }
+
 }
 
 // _wsPatch is defined above in the WS data layer
